@@ -1,0 +1,28 @@
+{
+  "name": "ultrapie",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ultrapie platform monorepo",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
+    "test": "vitest run",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "infra:logs": "docker compose logs -f"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.64.1",
+    "prettier": "^3.5.3",
+    "turbo": "^2.4.4",
+    "typescript": "^5.8.2",
+    "vitest": "^5.0.5"
+  },
+  "packageManager": "pnpm@12.15.0",
+  "dependencies": {
+    "@swc/helpers": "^0.5.23"
+  }
+}

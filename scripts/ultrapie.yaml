@@ -1,0 +1,25 @@
+# Traefik Dynamic Configuration for Ultrapie Web & Studio
+http:
+  routers:
+    ultrapie_web:
+      rule: Host(`ultrapie.com`) || Host(`www.ultrapie.com`) || Host(`studio.ultrapie.com`) || Host(`hosting.ultrapie.com`) || Host(`ultrapie.tajil.com`)
+      entryPoints:
+        - http
+        - https
+      service: ultrapie_web_svc
+    ultrapie_api:
+      rule: Host(`api.ultrapie.com`) || Host(`api.ultrapie.tajil.com`)
+      entryPoints:
+        - http
+        - https
+      service: ultrapie_api_svc
+
+  services:
+    ultrapie_web_svc:
+      loadBalancer:
+        servers:
+          - url: http://10.0.1.1:3005
+    ultrapie_api_svc:
+      loadBalancer:
+        servers:
+          - url: http://10.0.1.1:4000

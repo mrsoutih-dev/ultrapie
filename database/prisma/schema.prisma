@@ -1,0 +1,262 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum PlanTier {
+  FREE
+  STARTER
+  PRO
+  BUSINESS
+}
+
+enum DeploymentStatus {
+  QUEUED
+  BUILDING
+  FAILED
+  READY
+  PROMOTING
+  LIVE
+  CANCELLED
+}
+
+enum AssetScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  QUARANTINED
+}
+
+model User {
+  id            String       @id @default(uuid())
+  email         String       @unique
+  passwordHash  String
+  name          String?
+  avatarUrl     String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  memberships   Membership[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+model Organization {
+  id                String             @id @default(uuid())
+  name              String
+  slug              String             @unique
+  planTier          PlanTier           @default(FREE)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  memberships       Membership[]
+  projects          Project[]
+  githubConnection  GitHubConnection?
+  subscription      Subscription?
+  auditLogs         AuditLog[]
+  aiUsage           AIUsage[]
+
+  @@map("organizations")
+}
+
+model Membership {
+  id             String       @id @default(uuid())
+  userId         String
+  organizationId String
+  role           Role         @default(MEMBER)
+  createdAt      DateTime     @default(now())
+
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@map("memberships")
+}
+
+model Project {
+  id             String        @id @default(uuid())
+  organizationId String
+  name           String
+  slug           String
+  description    String?
+  framework      String        @default("vite-react")
+  status         String        @default("active")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  repository     Repository?
+  deployments    Deployment[]
+  releases       Release[]
+  domains        Domain[]
+  assets         Asset[]
+  aiSessions     AISession[]
+  aiUsage        AIUsage[]
+
+  @@unique([organizationId, slug])
+  @@map("projects")
+}
+
+model AISession {
+  id            String    @id @default(uuid())
+  projectId     String
+  title         String    @default("New Session")
+  contextBudget Int       @default(32000)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("ai_sessions")
+}
+
+model AIUsage {
+  id               String       @id @default(uuid())
+  projectId        String
+  organizationId   String
+  model            String
+  promptTokens     Int
+  candidateTokens  Int
+  totalTokens      Int
+  costEstimateUsd  Float        @default(0.0)
+  createdAt        DateTime     @default(now())
+
+  project          Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("ai_usage")
+}
+
+model GitHubConnection {
+  id              String       @id @default(uuid())
+  organizationId  String       @unique
+  installationId  Int
+  accountLogin    String
+  accountType     String       @default("User")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("github_connections")
+}
+
+model Repository {
+  id            String    @id @default(uuid())
+  projectId     String    @unique
+  repoFullName  String
+  defaultBranch String    @default("main")
+  lastCommitSha String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("repositories")
+}
+
+model Deployment {
+  id              String           @id @default(uuid())
+  projectId       String
+  commitSha       String
+  status          DeploymentStatus @default(QUEUED)
+  buildLogsUrl    String?
+  buildDurationMs Int?
+  triggerSource   String           @default("studio")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  release         Release?
+
+  @@map("deployments")
+}
+
+model Release {
+  id           String     @id @default(uuid())
+  deploymentId String     @unique
+  projectId    String
+  storageKey   String
+  releaseUrl   String
+  isActive     Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+
+  deployment   Deployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  project      Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("releases")
+}
+
+model Domain {
+  id                 String   @id @default(uuid())
+  projectId          String
+  hostname           String   @unique
+  verificationStatus String   @default("pending")
+  sslStatus          String   @default("pending")
+  isApex             Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("domains")
+}
+
+model Asset {
+  id         String          @id @default(uuid())
+  projectId  String
+  filename   String
+  mimeType   String
+  sizeBytes  Int
+  scanStatus AssetScanStatus @default(PENDING)
+  r2Key      String
+  createdAt  DateTime        @default(now())
+
+  project    Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("assets")
+}
+
+model Subscription {
+  id                   String       @id @default(uuid())
+  organizationId       String       @unique
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  status               String       @default("active")
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  organization         Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+model AuditLog {
+  id             String       @id @default(uuid())
+  organizationId String
+  userId         String?
+  action         String
+  targetType     String
+  targetId       String
+  metadata       Json?
+  ipAddress      String?
+  createdAt      DateTime     @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
