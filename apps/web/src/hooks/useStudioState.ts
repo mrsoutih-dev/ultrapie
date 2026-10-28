@@ -233,6 +233,32 @@ export function useStudioState() {
     setPreviewKey((k) => k + 1);
   }, []);
 
+  const loadTemplate = useCallback(
+    (templateFiles: Record<string, string>, templateName: string) => {
+      setFiles(templateFiles);
+      const mainFile =
+        Object.keys(templateFiles).find((k) => k === 'src/App.tsx' || k.endsWith('.tsx')) ||
+        Object.keys(templateFiles)[0];
+      if (mainFile) {
+        setActiveFile(mainFile);
+      }
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('ultrapie_studio_files', JSON.stringify(templateFiles));
+      }
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: 'tpl-' + Date.now(),
+          role: 'assistant',
+          content: `Loaded the **${templateName}** starter template into your workspace! You can inspect, edit the code, or ask me to customize any feature.`,
+          timestamp: new Date().toLocaleTimeString(),
+        },
+      ]);
+      setPreviewKey((k) => k + 1);
+    },
+    []
+  );
+
   const sendPrompt = useCallback(
     async (promptText: string) => {
       const text = promptText.trim();
@@ -432,6 +458,7 @@ export function useStudioState() {
     applyPendingPatches,
     rejectPendingPatches,
     resetStudio,
+    loadTemplate,
     sendPrompt,
   };
 }

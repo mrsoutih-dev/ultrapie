@@ -10,6 +10,8 @@ import { SettingsModal } from '@/components/studio/SettingsModal';
 import { GitHubDeployModal } from '@/components/studio/GitHubDeployModal';
 import { CoolifyStudioDeployModal } from '@/components/studio/CoolifyStudioDeployModal';
 import { EasyDeployModal } from '@/components/studio/EasyDeployModal';
+import { TemplateGalleryModal } from '@/components/studio/TemplateGalleryModal';
+import { exportProjectToZip } from '@/lib/studio/zip-export';
 import { useStudioState } from '@/hooks/useStudioState';
 import { useTheme } from '@/context/ThemeContext';
 import { Code2, Eye, Split, FileCheck } from 'lucide-react';
@@ -46,6 +48,7 @@ export default function StudioPage() {
     applyPendingPatches,
     rejectPendingPatches,
     resetStudio,
+    loadTemplate,
     sendPrompt,
   } = useStudioState();
 
@@ -58,6 +61,14 @@ export default function StudioPage() {
   const [isGitHubOpen, setIsGitHubOpen] = useState(false);
   const [isCoolifyOpen, setIsCoolifyOpen] = useState(false);
   const [isEasyDeployOpen, setIsEasyDeployOpen] = useState(false);
+  const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
+
+  const handleExportZip = async () => {
+    await exportProjectToZip({
+      projectName: 'Ultrapie App',
+      files,
+    });
+  };
 
   const editorRef = React.useRef<any>(null);
 
@@ -103,6 +114,8 @@ export default function StudioPage() {
         onOpenGitHub={() => setIsGitHubOpen(true)}
         onOpenCoolify={() => setIsCoolifyOpen(true)}
         onOpenEasyDeploy={() => setIsEasyDeployOpen(true)}
+        onOpenTemplates={() => setIsTemplatesOpen(true)}
+        onExportZip={handleExportZip}
         onResetStudio={resetStudio}
         isDeploying={isDeploying}
       />
@@ -244,6 +257,13 @@ export default function StudioPage() {
         onClose={() => setIsEasyDeployOpen(false)}
         files={files}
         projectName="Ultrapie App"
+      />
+
+      {/* 7. Starter Template Gallery Modal */}
+      <TemplateGalleryModal
+        isOpen={isTemplatesOpen}
+        onClose={() => setIsTemplatesOpen(false)}
+        onSelectTemplate={(tplFiles, name) => loadTemplate(tplFiles, name)}
       />
     </div>
   );

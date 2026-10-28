@@ -29,6 +29,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   LayoutDashboard,
+  Download,
 } from 'lucide-react';
 import { ViewportMode } from '@/hooks/useStudioState';
 import { useAuth } from '@/context/AuthContext';
@@ -45,6 +46,8 @@ interface TopBarProps {
   onOpenGitHub?: () => void;
   onOpenCoolify?: () => void;
   onOpenEasyDeploy?: () => void;
+  onOpenTemplates?: () => void;
+  onExportZip?: () => void;
   onResetStudio?: () => void;
   isDeploying?: boolean;
 }
@@ -60,6 +63,8 @@ export function TopBar({
   onOpenGitHub,
   onOpenCoolify,
   onOpenEasyDeploy,
+  onOpenTemplates,
+  onExportZip,
   onResetStudio,
   isDeploying,
 }: TopBarProps) {
@@ -232,6 +237,38 @@ export function TopBar({
           >
             <Crown className="h-3.5 w-3.5 fill-current" />
             <span>Admin Hub</span>
+          </button>
+        )}
+
+        {/* Starter Templates Gallery */}
+        {onOpenTemplates && (
+          <button
+            onClick={onOpenTemplates}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border transition-colors ${
+              isLight
+                ? 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100'
+                : 'bg-slate-900 border-purple-800/70 text-purple-300 hover:bg-slate-800'
+            }`}
+            title="Browse and fork starter templates"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-purple-400" />
+            <span>Templates</span>
+          </button>
+        )}
+
+        {/* 1-Click Project ZIP Export */}
+        {onExportZip && (
+          <button
+            onClick={onExportZip}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border transition-colors ${
+              isLight
+                ? 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'
+                : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'
+            }`}
+            title="Download complete runnable project as .ZIP"
+          >
+            <Download className="h-3.5 w-3.5 text-emerald-400" />
+            <span>Export</span>
           </button>
         )}
 

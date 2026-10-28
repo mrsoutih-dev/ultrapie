@@ -63,6 +63,8 @@
 | 37 | **Infrastructure** | Turnkey Wildcard Ingress & TLS Gateway | Caddyfile reverse-proxy with automated ACME TLS for `*.ultrapie.com` / `*.vibeheberg.com` | `[x] PASSED` |
 | 38 | **AI Studio** | Fullstack Database-Aware Generation | Auto-generates Prisma models, typed database clients, and interactive CRUD state | `[x] PASSED` |
 | 39 | **Infrastructure** | Turnkey Production Docker Compose Stack | Multi-container stack (Caddy, Web, Postgres 16, Redis 7, Coolify) with healthchecks | `[x] PASSED` |
+| 40 | **Studio** | Starter Template Gallery | 6 curated production templates (SaaS, Fullstack DB, Store, Chatbot, Crypto, Portfolio) | `[x] PASSED` |
+| 41 | **Studio** | 1-Click Project ZIP Exporter | Complete runnable Vite+React 19 archive download with dependencies & scripts | `[x] PASSED` |
 
 ---
 
