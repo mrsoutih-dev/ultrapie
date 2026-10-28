@@ -60,27 +60,30 @@ export async function POST(req: NextRequest) {
       parts: [{ text: msg.text || msg.content || '' }],
     }));
 
-    const config: any = {
-      temperature: Number(temperature),
-      topP: Number(topP),
-      maxOutputTokens: Number(maxOutputTokens),
-    };
+    const aiStudioSystemInstruction = `You are Google Gemini / Ultrapie AI, an elite Polymath, Principal AI Research Scientist, and World-Class Solutions Architect — operating with the same depth, precision, nuance, and cognitive brilliance as Google AI Studio and Google DeepMind Antigravity.
 
-    if (systemInstruction && systemInstruction.trim()) {
-      config.systemInstruction = systemInstruction.trim();
-    }
+CORE CAPABILITIES & COMMUNICATION PRINCIPLES:
+1. Deep First-Principles Reasoning: When answered, unpack complex questions logically from foundational concepts. Never give shallow, generic, or robotic canned responses.
+2. Comprehensive & Nuanced Explanations: Address edge cases, tradeoffs, second-order effects, and underlying mechanisms across any discipline: computer science, software architecture, mathematics, philosophy, science, history, linguistics, and creative synthesis.
+3. Clean Structured Formatting: Structure your thoughts with clear markdown headers, bold emphases, bullet points, numbered sequential steps, and well-commented, production-grade code snippets when technical subjects are discussed.
+4. Natural Linguistic Mastery: Converse natively and fluently in whatever language the user prompts with (including eloquent, idiomatic Arabic or nuanced technical English). Match the user's intent precisely without unnecessary fluff or sales pitches.`;
+
+    const config: any = {
+      temperature: Number(temperature) || 0.7,
+      topP: Number(topP) || 0.95,
+      maxOutputTokens: Number(maxOutputTokens) || 4096,
+      systemInstruction: (systemInstruction && systemInstruction.trim()) ? systemInstruction.trim() : aiStudioSystemInstruction,
+    };
 
     const modelCandidates = [
       model,
-      'gemini-3.5-flash-lite',
-      'gemini-3.1-flash-lite',
-      'gemini-3.8-flash',
       'gemini-flash-lite-latest',
-      'gemma-4-26b-a4b-it',
-      'gemini-3.5-flash',
       'gemini-3-flash-preview',
+      'gemini-3.8-flash',
+      'gemini-3.5-flash',
       'gemini-flash-latest',
-    ];
+      'gemma-4-26b-a4b-it',
+    ].filter((m, idx, arr) => m && arr.indexOf(m) === idx);
 
     let responseStream: any = null;
     let selectedModel = model;
@@ -94,7 +97,7 @@ export async function POST(req: NextRequest) {
         });
 
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout connecting to Gemini model ' + m)), 7000)
+          setTimeout(() => reject(new Error('Timeout connecting to Gemini model ' + m)), 3500)
         );
 
         responseStream = (await Promise.race([streamPromise, timeoutPromise])) as any;

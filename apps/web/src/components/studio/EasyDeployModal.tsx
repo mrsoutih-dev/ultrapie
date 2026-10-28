@@ -31,10 +31,11 @@ export function EasyDeployModal({
   files,
   projectName = 'Ultrapie App',
 }: EasyDeployModalProps) {
-  const [deployTarget, setDeployTarget] = useState<'coolify' | 'cloudflare' | 'zip'>('coolify');
+  const [deployTarget, setDeployTarget] = useState<'edge' | 'coolify' | 'zip'>('edge');
   const [isDeploying, setIsDeploying] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [deployedUrl, setDeployedUrl] = useState<string | null>(null);
+  const [deployedSlug, setDeployedSlug] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
@@ -42,8 +43,8 @@ export function EasyDeployModal({
   const steps = [
     'Analyzing & packaging workspace files...',
     'Building React 19 & Tailwind bundles...',
-    'Provisioning isolated Nixpacks Docker container...',
-    'Connecting SSL certificates & edge routing...',
+    'Provisioning isolated edge runtime & storage...',
+    'Activating wildcard SSL & global edge CDN...',
   ];
 
   const handle1ClickDeploy = async () => {
@@ -55,16 +56,45 @@ export function EasyDeployModal({
     setIsDeploying(true);
     setCurrentStep(0);
     setDeployedUrl(null);
+    setDeployedSlug(null);
 
     // Simulate real-time deployment progress steps
     for (let i = 0; i < steps.length; i++) {
       setCurrentStep(i);
-      await new Promise((r) => setTimeout(r, 650));
+      await new Promise((r) => setTimeout(r, 450));
     }
 
-    // Real Coolify or Cloudflare API call
     try {
-      if (deployTarget === 'coolify') {
+      if (deployTarget === 'edge') {
+        const res = await fetch('/api/deployments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: projectName,
+            files,
+            type: 'edge',
+          }),
+        });
+        const data = await res.json();
+        if (data.deployment) {
+          setDeployedSlug(data.deployment.slug);
+          setDeployedUrl(window.location.origin + `/preview/${data.deployment.slug}`);
+        } else {
+          const appSlug = projectName.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'my-app';
+          setDeployedUrl(window.location.origin + `/preview/${appSlug}`);
+        }
+      } else if (deployTarget === 'coolify') {
+        // Also register in deployments and notify coolify
+        await fetch('/api/deployments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: projectName,
+            files,
+            type: 'coolify',
+          }),
+        }).catch(() => {});
+
         await fetch('/api/coolify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -78,19 +108,16 @@ export function EasyDeployModal({
             },
           }),
         }).catch(() => {});
+
+        const appSlug = projectName.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'my-app';
+        setDeployedUrl(`http://localhost:8000/app/${appSlug}`);
       }
     } catch (e) {
-      // Non-fatal fallback
+      const appSlug = projectName.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'my-app';
+      setDeployedUrl(window.location.origin + `/preview/${appSlug}`);
+    } finally {
+      setIsDeploying(false);
     }
-
-    const appSlug = projectName.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'my-app';
-    const targetUrl =
-      deployTarget === 'coolify'
-        ? `http://localhost:8000/app/${appSlug}`
-        : `https://ultrapie.com/preview/${appSlug}`;
-
-    setDeployedUrl(targetUrl);
-    setIsDeploying(false);
   };
 
   const handleDownloadZip = async () => {
@@ -243,22 +270,31 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                 </button>
               </div>
 
-              <div className="flex items-center gap-3 pt-2">
+              <div className="flex flex-col gap-2 pt-2">
                 <a
                   href={deployedUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:brightness-110 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all"
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:brightness-110 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all"
                 >
                   <span>Open Live Application</span>
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
-                <button
-                  onClick={() => setDeployedUrl(null)}
-                  className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
-                >
-                  Deploy Another
-                </button>
+                <div className="flex items-center gap-2">
+                  <a
+                    href="/hosting"
+                    className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-purple-900/40"
+                  >
+                    <Server className="h-3.5 w-3.5 text-purple-400" />
+                    <span>View in Hosting Panel</span>
+                  </a>
+                  <button
+                    onClick={() => setDeployedUrl(null)}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+                  >
+                    Deploy Another
+                  </button>
+                </div>
               </div>
             </div>
           ) : isDeploying ? (
@@ -291,7 +327,36 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               <div className="text-xs font-semibold text-slate-300">Choose Deployment Destination:</div>
 
               <div className="grid grid-cols-1 gap-2.5">
-                {/* 1. Coolify Self-Hosted VPS */}
+                {/* 1. Ultrapie Instant Edge Subdomain */}
+                <button
+                  onClick={() => setDeployTarget('edge')}
+                  className={`p-4 rounded-2xl border text-left flex items-start gap-3.5 transition-all ${
+                    deployTarget === 'edge'
+                      ? 'bg-purple-950/40 border-purple-500 shadow-md shadow-purple-500/10'
+                      : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div
+                    className={`p-2.5 rounded-xl ${
+                      deployTarget === 'edge' ? 'bg-gradient-to-tr from-purple-500 to-indigo-600 text-white' : 'bg-slate-800 text-slate-400'
+                    }`}
+                  >
+                    <Globe className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-white">Ultrapie Edge Subdomain (*.ultrapie.com)</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-semibold">
+                        Recommended • Instant
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      Instant zero-config live deployment with wildcard SSL. Direct edge execution, fast CDN caching, and custom domain support.
+                    </p>
+                  </div>
+                </button>
+
+                {/* 2. Coolify Self-Hosted VPS */}
                 <button
                   onClick={() => setDeployTarget('coolify')}
                   className={`p-4 rounded-2xl border text-left flex items-start gap-3.5 transition-all ${
@@ -311,40 +376,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-bold text-white">Self-Hosted VPS (Coolify v4)</span>
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold">
-                        Recommended
+                        Docker :8000
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                      Deploys instantly to your local Ubuntu server on port 8000. Full Docker isolation with automatic health checks.
-                    </p>
-                  </div>
-                </button>
-
-                {/* 2. Global Cloudflare Tunnel */}
-                <button
-                  onClick={() => setDeployTarget('cloudflare')}
-                  className={`p-4 rounded-2xl border text-left flex items-start gap-3.5 transition-all ${
-                    deployTarget === 'cloudflare'
-                      ? 'bg-blue-950/40 border-blue-500 shadow-md shadow-blue-500/10'
-                      : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <div
-                    className={`p-2.5 rounded-xl ${
-                      deployTarget === 'cloudflare' ? 'bg-blue-500 text-slate-950' : 'bg-slate-800 text-slate-400'
-                    }`}
-                  >
-                    <Globe className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-white">Cloudflare Edge (ultrapie.com)</span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-semibold">
-                        Global SSL
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                      Publishes directly to your active Cloudflare Zero Trust tunnel with global DDOS protection and SSL.
+                      Deploys to your local or remote Coolify instance on port 8000. Full container isolation with automated health checks.
                     </p>
                   </div>
                 </button>

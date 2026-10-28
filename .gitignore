@@ -48,5 +48,6 @@ coverage/
 tmp/
 temp/
 quarantine/
+.data/
 data/
 *.tsbuildinfo

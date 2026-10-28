@@ -110,7 +110,7 @@ export function useStudioState() {
 
   // Settings
   const [geminiApiKey, setGeminiApiKey] = useState<string>('');
-  const [geminiModel, setGeminiModel] = useState<string>('gemini-3.5-flash-lite');
+  const [geminiModel, setGeminiModel] = useState<string>('gemini-3-flash-preview');
 
   useEffect(() => {
     if (typeof window !== 'undefined') {

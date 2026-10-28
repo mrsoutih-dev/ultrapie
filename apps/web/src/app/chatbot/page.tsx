@@ -50,11 +50,11 @@ const PRESET_SYSTEM_INSTRUCTIONS = [
 ];
 
 const AVAILABLE_MODELS = [
-  { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite', badge: 'Active Free Quota' },
-  { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite', badge: 'Fastest' },
+  { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', badge: 'AI Studio Reasoning' },
   { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', badge: 'Flagship' },
   { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', badge: 'Stable' },
-  { id: 'gemini-flash-lite-latest', name: 'Gemini Flash Lite Latest', badge: 'Auto' },
+  { id: 'gemini-flash-latest', name: 'Gemini Flash Latest', badge: 'Auto' },
+  { id: 'gemini-flash-lite-latest', name: 'Gemini Flash Lite Latest', badge: 'Fast' },
   { id: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B Instruct', badge: 'Open Weights' },
 ];
 
@@ -64,16 +64,16 @@ export default function ChatbotPage() {
       id: 'welcome',
       role: 'assistant',
       content:
-        '👋 Welcome to the **Google AI Studio Chatbot** for Ultrapie!\n\nI am connected directly to your Google Gemini API. Ask me anything or explore development concepts!\n\n💡 **Tip:** If you want to generate complete React 19 apps with a **real-time Live Preview Sandbox** and Monaco code streaming, click **[Open Studio with Live Preview](/studio)** at the top right!',
+        '👋 Welcome to the **Google AI Studio Engine** for Ultrapie!\n\nI am connected directly to your official Google Gemini models with deep multi-turn reasoning and nuanced conversational intelligence. Ask me anything: software architecture, philosophy, science, complex code debugging, or project design!\n\n💡 **Tip:** If you want to generate complete React 19 apps with a **real-time Live Preview Sandbox** and Monaco code streaming, click **[Open Studio with Live Preview](/studio)** at the top right!',
       timestamp: 'Just now',
     },
   ]);
 
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('gemini-3.5-flash-lite');
+  const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview');
   const [systemInstruction, setSystemInstruction] = useState(
-    'You are a helpful, accurate, and concise AI assistant powered by Google Gemini.'
+    'You are Google Gemini / Ultrapie AI, an elite Polymath, Principal AI Research Scientist, and World-Class Solutions Architect — operating with the same depth, precision, nuance, and cognitive brilliance as Google AI Studio.'
   );
   const [temperature, setTemperature] = useState(0.7);
   const [topP, setTopP] = useState(0.95);

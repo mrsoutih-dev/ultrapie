@@ -11,6 +11,7 @@ import {
   Bot,
   User,
   Loader2,
+  Copy,
 } from 'lucide-react';
 import { ChatMessage } from '@/hooks/useStudioState';
 import { FilePatch } from '@ultrapie/shared';
@@ -53,9 +54,39 @@ function renderInlineMarkdown(text: string) {
   });
 }
 
+function CodeSnippet({ code, lang }: { code: string; lang: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    if (typeof navigator !== 'undefined') {
+      navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div className="my-2 rounded-lg bg-slate-950 border border-slate-800 overflow-hidden shadow-sm">
+      <div className="px-2.5 py-1 bg-slate-900 border-b border-slate-800 text-[10px] text-slate-400 font-mono flex items-center justify-between">
+        <span className="font-semibold text-cyan-400">{lang || 'code'}</span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-white transition-colors cursor-pointer"
+        >
+          {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+          <span>{copied ? 'Copied' : 'Copy'}</span>
+        </button>
+      </div>
+      <pre className="p-2.5 text-[11px] font-mono text-cyan-300 overflow-x-auto whitespace-pre">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
 function renderFormattedMessage(content: string) {
   if (!content) return null;
-  if (!content.includes('#') && !content.includes('**') && !content.includes('```') && !content.includes('* ') && !content.includes('- ')) {
+  if (!content.includes('#') && !content.includes('**') && !content.includes('```') && !content.includes('* ') && !content.includes('- ') && !content.includes('|')) {
     return <p className="whitespace-pre-wrap">{content}</p>;
   }
 
@@ -68,80 +99,127 @@ function renderFormattedMessage(content: string) {
           const firstLineEnd = part.indexOf('\n');
           const lang = firstLineEnd !== -1 ? part.substring(3, firstLineEnd).trim() : 'code';
           const code = firstLineEnd !== -1 ? part.substring(firstLineEnd + 1, part.length - 3).trim() : part.slice(3, -3);
-          return (
-            <div key={pIdx} className="my-2 rounded-lg bg-slate-950 border border-slate-800 overflow-hidden">
-              <div className="px-2.5 py-1 bg-slate-900 border-b border-slate-800 text-[10px] text-slate-400 font-mono flex items-center justify-between">
-                <span>{lang || 'code'}</span>
+          return <CodeSnippet key={pIdx} code={code} lang={lang} />;
+        }
+
+        const rawLines = part.split('\n');
+        const elements: React.ReactNode[] = [];
+        let tableBuffer: string[] = [];
+
+        const flushTable = () => {
+          if (tableBuffer.length >= 2) {
+            const header = tableBuffer[0].split('|').map(s => s.trim()).filter(Boolean);
+            const rows = tableBuffer.slice(2).map(r => r.split('|').map(s => s.trim()).filter(Boolean));
+            elements.push(
+              <div key={`tbl-${elements.length}`} className="my-2 overflow-x-auto rounded-lg border border-slate-800">
+                <table className="min-w-full text-[11px] text-left border-collapse">
+                  <thead className="bg-slate-900 border-b border-slate-800 text-slate-200">
+                    <tr>
+                      {header.map((h, hi) => (
+                        <th key={hi} className="px-2.5 py-1.5 font-semibold text-white">
+                          {renderInlineMarkdown(h)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 bg-slate-950/70">
+                    {rows.map((row, ri) => (
+                      <tr key={ri} className="hover:bg-slate-900/50">
+                        {row.map((cell, ci) => (
+                          <td key={ci} className="px-2.5 py-1 text-slate-300">
+                            {renderInlineMarkdown(cell)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <pre className="p-2.5 text-[11px] font-mono text-cyan-300 overflow-x-auto whitespace-pre">
-                <code>{code}</code>
-              </pre>
-            </div>
+            );
+          }
+          tableBuffer = [];
+        };
+
+        for (let lIdx = 0; lIdx < rawLines.length; lIdx++) {
+          const line = rawLines[lIdx];
+          const trimmed = line.trim();
+
+          if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+            tableBuffer.push(trimmed);
+            continue;
+          } else if (tableBuffer.length > 0) {
+            flushTable();
+          }
+
+          if (!trimmed) {
+            elements.push(<div key={`empty-${lIdx}`} className="h-1.5" />);
+            continue;
+          }
+
+          if (trimmed.startsWith('### ')) {
+            elements.push(
+              <h4 key={`h4-${lIdx}`} className="font-bold text-white text-xs mt-2 mb-1">
+                {renderInlineMarkdown(trimmed.replace(/^###\s+/, ''))}
+              </h4>
+            );
+            continue;
+          }
+          if (trimmed.startsWith('## ')) {
+            elements.push(
+              <h3 key={`h3-${lIdx}`} className="font-bold text-white text-sm mt-2 mb-1">
+                {renderInlineMarkdown(trimmed.replace(/^##\s+/, ''))}
+              </h3>
+            );
+            continue;
+          }
+          if (trimmed.startsWith('# ')) {
+            elements.push(
+              <h2 key={`h2-${lIdx}`} className="font-bold text-white text-base mt-2 mb-1">
+                {renderInlineMarkdown(trimmed.replace(/^#\s+/, ''))}
+              </h2>
+            );
+            continue;
+          }
+
+          if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+            elements.push(
+              <div key={`bullet-${lIdx}`} className="flex items-start gap-1.5 pl-1 my-0.5">
+                <span className="text-cyan-400 text-xs leading-tight">•</span>
+                <span className="flex-1 text-slate-200">
+                  {renderInlineMarkdown(trimmed.substring(2))}
+                </span>
+              </div>
+            );
+            continue;
+          }
+
+          const numMatch = trimmed.match(/^(\d+)\.\s+(.*)/);
+          if (numMatch) {
+            elements.push(
+              <div key={`num-${lIdx}`} className="flex items-start gap-1.5 pl-1 my-0.5">
+                <span className="text-cyan-400 font-semibold text-[11px] min-w-4">
+                  {numMatch[1]}.
+                </span>
+                <span className="flex-1 text-slate-200">
+                  {renderInlineMarkdown(numMatch[2])}
+                </span>
+              </div>
+            );
+            continue;
+          }
+
+          elements.push(
+            <p key={`p-${lIdx}`} className="text-slate-300">
+              {renderInlineMarkdown(line)}
+            </p>
           );
         }
 
-        const lines = part.split('\n');
-        return (
-          <div key={pIdx} className="space-y-1">
-            {lines.map((line, lIdx) => {
-              const trimmed = line.trim();
-              if (!trimmed) return <div key={lIdx} className="h-1.5" />;
+        if (tableBuffer.length > 0) {
+          flushTable();
+        }
 
-              if (trimmed.startsWith('### ')) {
-                return (
-                  <h4 key={lIdx} className="font-bold text-white text-xs mt-2 mb-1">
-                    {renderInlineMarkdown(trimmed.replace(/^###\s+/, ''))}
-                  </h4>
-                );
-              }
-              if (trimmed.startsWith('## ')) {
-                return (
-                  <h3 key={lIdx} className="font-bold text-white text-sm mt-2 mb-1">
-                    {renderInlineMarkdown(trimmed.replace(/^##\s+/, ''))}
-                  </h3>
-                );
-              }
-              if (trimmed.startsWith('# ')) {
-                return (
-                  <h2 key={lIdx} className="font-bold text-white text-base mt-2 mb-1">
-                    {renderInlineMarkdown(trimmed.replace(/^#\s+/, ''))}
-                  </h2>
-                );
-              }
-
-              if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
-                return (
-                  <div key={lIdx} className="flex items-start gap-1.5 pl-1 my-0.5">
-                    <span className="text-cyan-400 text-xs leading-tight">•</span>
-                    <span className="flex-1 text-slate-200">
-                      {renderInlineMarkdown(trimmed.substring(2))}
-                    </span>
-                  </div>
-                );
-              }
-
-              const numMatch = trimmed.match(/^(\d+)\.\s+(.*)/);
-              if (numMatch) {
-                return (
-                  <div key={lIdx} className="flex items-start gap-1.5 pl-1 my-0.5">
-                    <span className="text-cyan-400 font-semibold text-[11px] min-w-4">
-                      {numMatch[1]}.
-                    </span>
-                    <span className="flex-1 text-slate-200">
-                      {renderInlineMarkdown(numMatch[2])}
-                    </span>
-                  </div>
-                );
-              }
-
-              return (
-                <p key={lIdx} className="text-slate-300">
-                  {renderInlineMarkdown(line)}
-                </p>
-              );
-            })}
-          </div>
-        );
+        return <div key={pIdx} className="space-y-1">{elements}</div>;
       })}
     </div>
   );
@@ -190,8 +268,8 @@ export function AIChatPane({
         </div>
         <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-cyan-950 border border-cyan-800 text-[10px] text-cyan-400 font-mono shadow-inner">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span className="truncate max-w-[110px]">
-            {geminiModel ? geminiModel.replace('gemini-', 'Gemini ').replace('-lite', ' Lite') : 'Gemini 3.5 Lite'}
+          <span className="truncate max-w-[130px]">
+            {geminiModel ? geminiModel.replace('gemini-', 'Gemini ').replace('-preview', '') : 'Gemini 3 Flash'}
           </span>
         </div>
       </div>

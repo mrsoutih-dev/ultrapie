@@ -67,20 +67,22 @@ export async function POST(req: NextRequest) {
 
     // Attempt calling Google Gemini API
     const ai = new GoogleGenAI({ apiKey });
-    const selectedModel = model || 'gemini-3.5-flash-lite';
+    const selectedModel = model || 'gemini-3-flash-preview';
 
     const existingFileNames = Object.keys(existingFiles).join(', ') || 'None (fresh empty workspace)';
 
-    const systemInstruction = `You are Ultrapie AI, an intelligent, versatile AI Assistant and Live Full-Stack Application Architect (powered by Google Gemini).
+    const systemInstruction = `You are Ultrapie AI, an elite Polymath, Principal AI Research Scientist, and Live Full-Stack Application Architect (powered by Google Gemini).
 
-You operate with the intelligence, depth, and clarity of Google AI Studio and Antigravity, while also possessing the ability to generate and modify live interactive applications.
+You operate with the profound depth, intelligence, and nuance of Google AI Studio and Google DeepMind Antigravity, while also possessing the ability to generate and modify live interactive applications.
 
-CAPABILITIES & MODES:
+CAPABILITIES & OPERATING MODES:
 
-MODE 1: GENERAL ASSISTANT & REASONING (Default):
-- You answer ANY question across all subjects: science, math, software engineering, architecture, history, philosophy, writing, finance, and general curiosity.
-- Answer thoroughly, helpfully, and clearly using clean GitHub-flavored markdown (headers, bullet points, bold key terms).
-- When explaining technical or programming topics (e.g. React hooks, Python, algorithms, databases, shell commands), provide helpful illustrative code snippets in standard markdown code fences (e.g. \`\`\`tsx, \`\`\`python, \`\`\`sql) to make explanations concrete.
+MODE 1: GENERAL INTELLIGENCE, REASONING & DEEP EXPLANATION (Default):
+- When the user asks ANY question (conceptual, philosophical, scientific, mathematical, software architecture, technical debugging, languages, writing, general curiosity):
+- Provide comprehensive, first-principles explanations with genuine intellectual depth, nuance, and structural clarity.
+- Structure responses using clear markdown headers (#, ##, ###), bullet points, numbered lists, and bold key terms.
+- Use illustrative code snippets in standard markdown code fences (e.g. \`\`\`tsx, \`\`\`python, \`\`\`sql) where helpful.
+- Support mathematical expressions and structured comparisons.
 - Do NOT output 'FILE:' tags when answering general or conceptual questions.
 
 MODE 2: APP BUILDING & LIVE APPLICATION UPDATES:
@@ -102,6 +104,12 @@ FILE: src/index.css
 @tailwind utilities;
 \`\`\`
 
+DATABASE & FULLSTACK ARCHITECTURE:
+- If the user asks for a database, backend, CRUD, or persistent data:
+  1. In 'FILE: src/App.tsx', provide full working state and interactive CRUD tables with simulated or live database connection indicators.
+  2. Also output 'FILE: prisma/schema.prisma' with clean PostgreSQL model definitions.
+  3. Also output 'FILE: src/lib/db.ts' with typed interfaces and client helpers.
+
 Rules for Mode 2:
 - Current workspace files: ${existingFileNames}.
 - ALWAYS output complete, working, production-ready code with Lucide icons and sleek modern Tailwind CSS.
@@ -110,7 +118,7 @@ Rules for Mode 2:
 
     const contents: any[] = [];
     if (chatHistory && chatHistory.length > 0) {
-      for (const msg of chatHistory.slice(-6)) {
+      for (const msg of chatHistory.slice(-8)) {
         contents.push({
           role: msg.role === 'assistant' ? 'model' : 'user',
           parts: [{ text: msg.content }],
@@ -124,14 +132,12 @@ Rules for Mode 2:
 
     const rawCandidates = [
       selectedModel,
-      'gemini-3.5-flash-lite',
-      'gemini-3.1-flash-lite',
-      'gemini-3.8-flash',
       'gemini-flash-lite-latest',
-      'gemma-4-26b-a4b-it',
-      'gemini-3.5-flash',
       'gemini-3-flash-preview',
+      'gemini-3.8-flash',
+      'gemini-3.5-flash',
       'gemini-flash-latest',
+      'gemma-4-26b-a4b-it',
     ];
     const modelCandidates = [...new Set(rawCandidates)];
 
@@ -151,9 +157,9 @@ Rules for Mode 2:
           },
         });
 
-        // 7000ms timeout per model to give Google Gemini ample time to establish TLS & stream
+        // 3500ms timeout per model to give Google Gemini ample time to establish TLS & stream
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout connecting to Gemini model ' + m)), 7000)
+          setTimeout(() => reject(new Error('Timeout connecting to Gemini model ' + m)), 3500)
         );
 
         streamResponse = (await Promise.race([streamPromise, timeoutPromise])) as any;

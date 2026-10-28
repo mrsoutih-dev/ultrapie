@@ -1,0 +1,60 @@
+# Ultrapie & VibeHeberg Production Edge Ingress Gateway (Caddy v2)
+# Handles automated TLS termination, wildcard subdomains, and zero-downtime routing
+
+{
+    # Global options
+    email security@ultrapie.com
+    admin off
+    auto_https disable_redirects
+}
+
+# 1. Main Platform Landing & Control Center
+ultrapie.com, vibeheberg.com {
+    reverse_proxy web:3000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    # Enable modern HTTP/3 compression
+    encode gzip zstd
+}
+
+# 2. Wildcard Instant Edge Deployments (*.ultrapie.com / *.vibeheberg.com)
+# Routes subdomains directly to the Next.js standalone runner (/preview/<slug>)
+*.ultrapie.com, *.vibeheberg.com {
+    # Extract subdomain slug from hostname
+    @subdomain {
+        header Host (.+)\.(ultrapie\.com|vibeheberg\.com)
+    }
+
+    # Reverse proxy to internal Next.js application
+    reverse_proxy web:3000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Ultrapie-Edge-Subdomain {http.host}
+    }
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    encode gzip zstd
+}
+
+# 3. Dedicated Coolify Self-Hosted Engine (:8000)
+coolify.ultrapie.internal, vps.ultrapie.internal {
+    reverse_proxy coolify:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}

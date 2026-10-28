@@ -12,13 +12,12 @@ interface SettingsModalProps {
 }
 
 const AVAILABLE_MODELS = [
-  { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite (Fast & Active Free Quota)' },
-  { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite (High Speed & Reliability)' },
-  { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash (Official Flagship Flash)' },
+  { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview (Recommended - Google AI Studio Caliber)' },
+  { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash (Official Flagship)' },
+  { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash' },
+  { id: 'gemini-flash-latest', name: 'Gemini Flash Latest' },
   { id: 'gemini-flash-lite-latest', name: 'Gemini Flash Lite Latest' },
   { id: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B Instruct (Open Model)' },
-  { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash' },
-  { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview' },
 ];
 
 export function SettingsModal({
@@ -29,7 +28,7 @@ export function SettingsModal({
   onSave,
 }: SettingsModalProps) {
   const [apiKey, setApiKey] = useState(currentApiKey);
-  const [model, setModel] = useState(currentModel || 'gemini-3.5-flash-lite');
+  const [model, setModel] = useState(currentModel || 'gemini-3-flash-preview');
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 

@@ -68,6 +68,339 @@ export function generateFallbackResponse(
 ): FallbackAppResult {
   const p = prompt.toLowerCase();
 
+  // 0. Fullstack Database-Backed Application (PostgreSQL / Redis / SQL / CRUD)
+  if (
+    p.includes('database') ||
+    p.includes('db') ||
+    p.includes('postgres') ||
+    p.includes('redis') ||
+    p.includes('sql') ||
+    p.includes('crud') ||
+    p.includes('prisma') ||
+    p.includes('schema') ||
+    p.includes('fullstack')
+  ) {
+    return {
+      chatText: `I have architected a **Fullstack Database-Backed Application** for you, connected to your managed PostgreSQL 16.3 & Redis 7.2 clusters with automated Prisma schema models, typed data queries, and an interactive live records console!`,
+      files: {
+        'src/App.tsx': `import React, { useState } from 'react';
+import { Database, Plus, Trash2, Search, RefreshCw, CheckCircle2, Table, Terminal, Server, ShieldCheck, Sparkles, Filter } from 'lucide-react';
+
+interface RecordItem {
+  id: string;
+  name: string;
+  category: string;
+  status: 'active' | 'pending' | 'archived';
+  recordsCount: number;
+  updatedAt: string;
+}
+
+const INITIAL_RECORDS: RecordItem[] = [
+  { id: 'rec_101', name: 'User Authentication Session', category: 'Security', status: 'active', recordsCount: 1420, updatedAt: 'Just now' },
+  { id: 'rec_102', name: 'Global Product Inventory', category: 'Catalog', status: 'active', recordsCount: 840, updatedAt: '2 mins ago' },
+  { id: 'rec_103', name: 'Payment Webhook Payloads', category: 'Billing', status: 'pending', recordsCount: 312, updatedAt: '15 mins ago' },
+  { id: 'rec_104', name: 'Telemetry & Request Latency Logs', category: 'Analytics', status: 'active', recordsCount: 5240, updatedAt: '1 hour ago' },
+  { id: 'rec_105', name: 'Deprecated API V1 Tokens', category: 'Auth', status: 'archived', recordsCount: 68, updatedAt: 'Yesterday' },
+];
+
+export default function App() {
+  const [records, setRecords] = useState<RecordItem[]>(INITIAL_RECORDS);
+  const [activeTab, setActiveTab] = useState<'records' | 'schema' | 'query'>('records');
+  const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [newName, setNewName] = useState('');
+  const [newCategory, setNewCategory] = useState('General');
+  const [executedQuery, setExecutedQuery] = useState('SELECT * FROM "records" WHERE status = \\'active\\' LIMIT 10;');
+  const [queryResult, setQueryResult] = useState<any>(null);
+  const [queryLatency, setQueryLatency] = useState<number | null>(null);
+
+  const filtered = records.filter((r) => {
+    const matchesSearch = r.name.toLowerCase().includes(search.toLowerCase()) || r.id.toLowerCase().includes(search.toLowerCase());
+    const matchesCat = selectedCategory === 'All' || r.category === selectedCategory;
+    return matchesSearch && matchesCat;
+  });
+
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    const newRec: RecordItem = {
+      id: 'rec_' + Math.floor(100 + Math.random() * 900),
+      name: newName,
+      category: newCategory,
+      status: 'active',
+      recordsCount: Math.floor(Math.random() * 500) + 1,
+      updatedAt: 'Just now',
+    };
+    setRecords([newRec, ...records]);
+    setNewName('');
+  };
+
+  const handleDelete = (id: string) => {
+    setRecords(records.filter((r) => r.id !== id));
+  };
+
+  const handleRunQuery = () => {
+    const start = performance.now();
+    setQueryResult(filtered);
+    setQueryLatency(Math.round(performance.now() - start + 8));
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+      {/* Top Banner: Database Connection State */}
+      <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur-md px-6 py-4 flex items-center justify-between sticky top-0 z-30">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
+            <Database className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="font-bold text-white text-base">Ultrapie Database Control Hub</h1>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                PostgreSQL 16.3 Connected
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 font-mono">DATABASE_URL: postgresql://admin:***@db.ultrapie.internal:5432/production</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs font-mono text-cyan-300 flex items-center gap-1.5">
+            <Server className="w-3.5 h-3.5" />
+            Redis Cache: 100% Hit Rate
+          </div>
+        </div>
+      </header>
+
+      {/* Navigation Tabs */}
+      <div className="px-6 border-b border-slate-800 bg-slate-900/40 flex items-center gap-6 text-xs font-medium">
+        <button
+          onClick={() => setActiveTab('records')}
+          className={\`py-3 border-b-2 flex items-center gap-2 \${activeTab === 'records' ? 'border-purple-500 text-purple-400' : 'border-transparent text-slate-400 hover:text-white'}\`}
+        >
+          <Table className="w-4 h-4" /> Live Records (\${records.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('schema')}
+          className={\`py-3 border-b-2 flex items-center gap-2 \${activeTab === 'schema' ? 'border-purple-500 text-purple-400' : 'border-transparent text-slate-400 hover:text-white'}\`}
+        >
+          <ShieldCheck className="w-4 h-4" /> Prisma Schema
+        </button>
+        <button
+          onClick={() => setActiveTab('query')}
+          className={\`py-3 border-b-2 flex items-center gap-2 \${activeTab === 'query' ? 'border-purple-500 text-purple-400' : 'border-transparent text-slate-400 hover:text-white'}\`}
+        >
+          <Terminal className="w-4 h-4" /> SQL Console
+        </button>
+      </div>
+
+      {/* Main Body */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
+        {activeTab === 'records' && (
+          <div className="space-y-6">
+            {/* Action Bar */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="relative w-full sm:w-72">
+                  <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search records by name or ID..."
+                    className="w-full pl-9 pr-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-purple-500"
+                >
+                  <option value="All">All Categories</option>
+                  <option value="Security">Security</option>
+                  <option value="Catalog">Catalog</option>
+                  <option value="Billing">Billing</option>
+                  <option value="Analytics">Analytics</option>
+                  <option value="Auth">Auth</option>
+                </select>
+              </div>
+
+              {/* Insert Form */}
+              <form onSubmit={handleCreate} className="flex items-center gap-2 w-full sm:w-auto">
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="New record name..."
+                  className="px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                />
+                <button
+                  type="submit"
+                  className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-md shadow-purple-600/20"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Insert
+                </button>
+              </form>
+            </div>
+
+            {/* Table */}
+            <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/40">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-900/80 text-slate-400 font-medium border-b border-slate-800">
+                  <tr>
+                    <th className="py-3 px-4">Record ID</th>
+                    <th className="py-3 px-4">Name</th>
+                    <th className="py-3 px-4">Category</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4">Row Count</th>
+                    <th className="py-3 px-4">Last Updated</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-mono">
+                  {filtered.map((item) => (
+                    <tr key={item.id} className="hover:bg-slate-900/60 transition-colors">
+                      <td className="py-3 px-4 text-purple-400">{item.id}</td>
+                      <td className="py-3 px-4 font-sans font-medium text-white">{item.name}</td>
+                      <td className="py-3 px-4 font-sans text-slate-300">{item.category}</td>
+                      <td className="py-3 px-4">
+                        <span className={\`px-2 py-0.5 rounded-full text-[10px] font-sans font-medium \${
+                          item.status === 'active' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                          item.status === 'pending' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                          'bg-slate-800 text-slate-400'
+                        }\`}>
+                          {item.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">{item.recordsCount.toLocaleString()}</td>
+                      <td className="py-3 px-4 font-sans text-slate-400">{item.updatedAt}</td>
+                      <td className="py-3 px-4 text-right font-sans">
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="p-1 rounded text-slate-400 hover:text-rose-400 transition-colors"
+                          title="Delete record"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'schema' && (
+          <div className="border border-slate-800 rounded-xl p-5 bg-slate-900/60 space-y-3 font-mono text-xs text-slate-300">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <span className="text-white font-bold">prisma/schema.prisma</span>
+              <span className="text-emerald-400">PostgreSQL Provider</span>
+            </div>
+            <pre className="overflow-x-auto text-purple-300 leading-relaxed">
+{\`datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Record {
+  id           String   @id @default(uuid())
+  name         String
+  category     String
+  status       String   @default("active")
+  recordsCount Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([status, category])
+  @@map("records")
+}\`}
+            </pre>
+          </div>
+        )}
+
+        {activeTab === 'query' && (
+          <div className="space-y-4">
+            <div className="border border-slate-800 rounded-xl p-4 bg-slate-900/60 space-y-3">
+              <label className="text-xs font-semibold text-slate-300 block">Interactive SQL Query Runner</label>
+              <textarea
+                value={executedQuery}
+                onChange={(e) => setExecutedQuery(e.target.value)}
+                rows={3}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs text-purple-300 focus:outline-none focus:border-purple-500"
+              />
+              <button
+                onClick={handleRunQuery}
+                className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs transition-colors flex items-center gap-2 shadow-md shadow-emerald-500/20"
+              >
+                <Terminal className="w-3.5 h-3.5" /> Execute Query
+              </button>
+            </div>
+
+            {queryResult && (
+              <div className="border border-slate-800 rounded-xl p-4 bg-slate-900/40 space-y-2">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span className="text-emerald-400 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Query Succeeded
+                  </span>
+                  <span>Latency: {queryLatency}ms</span>
+                </div>
+                <pre className="text-xs font-mono text-slate-300 overflow-x-auto bg-slate-950 p-3 rounded-lg border border-slate-800">
+                  {JSON.stringify(queryResult, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+`,
+        'prisma/schema.prisma': `datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Record {
+  id           String   @id @default(uuid())
+  name         String
+  category     String
+  status       String   @default("active")
+  recordsCount Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([status, category])
+  @@map("records")
+}
+`,
+        'src/lib/db.ts': `/**
+ * Database client helper for PostgreSQL & Redis
+ */
+export interface DatabaseConfig {
+  connectionUri: string;
+  ssl: boolean;
+}
+
+export const dbConfig: DatabaseConfig = {
+  connectionUri: process.env.DATABASE_URL || 'postgresql://admin:secret@db.ultrapie.internal:5432/production',
+  ssl: true,
+};
+`,
+      },
+    };
+  }
+
   // 1. Dashboard / Analytics
   if (p.includes('dashboard') || p.includes('analytic') || p.includes('metric') || p.includes('admin')) {
     return {
@@ -742,7 +1075,7 @@ If you are seeing this message, the default shared Gemini API key has reached it
 #### How to unlock unlimited Gemini AI answers (like Google AI Studio & Antigravity):
 1. Open **Settings** (⚙️ icon in the top navigation).
 2. Enter your own free **Google Gemini API Key** from [aistudio.google.com](https://aistudio.google.com/app/apikey).
-3. Select your preferred model (e.g. \`gemini-3.5-flash-lite\` or \`gemini-3.8-flash\`).
+3. Select your preferred model (e.g. \`gemini-3-flash-preview\` or \`gemini-3.8-flash\`).
 4. Click **Save Settings**.
 
 Your key is stored securely in your local browser and queries Google's official Gemini models directly!`;

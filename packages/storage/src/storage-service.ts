@@ -1,10 +1,24 @@
 import * as crypto from 'crypto';
-import { StorageBucketType, StorageObject, PresignedUrlResult } from './types.js';
+import {
+  StorageBucketType,
+  StorageObject,
+  PresignedUrlResult,
+  StorageBackupItem,
+  StorageBackupSnapshot,
+  StorageRestoreResult,
+} from './types';
 
 export class UnauthorizedStorageAccessError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'UnauthorizedStorageAccessError';
+  }
+}
+
+export class CorruptedBackupSnapshotError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CorruptedBackupSnapshotError';
   }
 }
 
@@ -73,6 +87,29 @@ export class StorageService {
   }
 
   /**
+   * Lists objects, optionally filtered by bucket.
+   */
+  async listObjects(bucket?: StorageBucketType): Promise<StorageObject[]> {
+    const all = Array.from(this.objects.values());
+    if (!bucket) return all;
+    return all.filter((o) => o.bucket === bucket);
+  }
+
+  /**
+   * Deletes an object from storage.
+   */
+  async deleteObject(bucket: StorageBucketType, key: string): Promise<boolean> {
+    return this.objects.delete(this.getCompositeKey(bucket, key));
+  }
+
+  /**
+   * Clears all stored objects (used during disaster drills and test resets).
+   */
+  clearAllObjects(): void {
+    this.objects.clear();
+  }
+
+  /**
    * Generates a short-lived presigned URL for secure access to private assets.
    */
   generatePresignedUrl(
@@ -128,4 +165,132 @@ export class StorageService {
   getPublicDeliveryUrl(bucket: 'public-assets' | 'releases', key: string): string {
     return `${this.cdnBaseUrl}/${bucket}/${key}`;
   }
+
+  /**
+   * Creates an immutable backup snapshot containing full binary data, metadata,
+   * and SHA-256 integrity checksums for every object.
+   */
+  async createBackupSnapshot(targetBucket?: StorageBucketType): Promise<StorageBackupSnapshot> {
+    const snapshotId = `snap_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const timestamp = new Date().toISOString();
+    const candidateObjects = Array.from(this.objects.values()).filter(
+      (obj) => !targetBucket || obj.bucket === targetBucket
+    );
+
+    let totalSizeBytes = 0;
+    const items: StorageBackupItem[] = candidateObjects.map((obj) => {
+      const buffer = Buffer.isBuffer(obj.data) ? obj.data : Buffer.from(obj.data, 'utf-8');
+      totalSizeBytes += buffer.length;
+      const dataBase64 = buffer.toString('base64');
+      const checksumSha256 = crypto.createHash('sha256').update(buffer).digest('hex');
+
+      return {
+        bucket: obj.bucket,
+        key: obj.key,
+        dataBase64,
+        contentType: obj.contentType,
+        metadata: obj.metadata,
+        createdAt: obj.createdAt,
+        checksumSha256,
+      };
+    });
+
+    // Compute deterministic manifest checksum across sorted items
+    const sortedSignatures = items
+      .map((item) => `${item.bucket}::${item.key}::${item.checksumSha256}`)
+      .sort()
+      .join('\n');
+    const manifestSha256 = crypto.createHash('sha256').update(sortedSignatures).digest('hex');
+
+    return {
+      id: snapshotId,
+      timestamp,
+      version: '1.0.0',
+      totalObjects: items.length,
+      totalSizeBytes,
+      manifestSha256,
+      items,
+    };
+  }
+
+  /**
+   * Verifies the cryptographic integrity of a backup snapshot.
+   */
+  verifySnapshotIntegrity(snapshot: StorageBackupSnapshot): boolean {
+    if (!snapshot || !Array.isArray(snapshot.items)) return false;
+
+    // Verify individual items
+    for (const item of snapshot.items) {
+      const buf = Buffer.from(item.dataBase64, 'base64');
+      const hash = crypto.createHash('sha256').update(buf).digest('hex');
+      if (hash !== item.checksumSha256) return false;
+    }
+
+    // Verify aggregate manifest
+    const sortedSignatures = snapshot.items
+      .map((item) => `${item.bucket}::${item.key}::${item.checksumSha256}`)
+      .sort()
+      .join('\n');
+    const computedManifest = crypto.createHash('sha256').update(sortedSignatures).digest('hex');
+
+    return computedManifest === snapshot.manifestSha256;
+  }
+
+  /**
+   * Restores storage objects from an immutable backup snapshot with SHA-256 verification.
+   */
+  async restoreFromSnapshot(
+    snapshot: StorageBackupSnapshot,
+    options: { overwrite?: boolean } = {}
+  ): Promise<StorageRestoreResult> {
+    const { overwrite = true } = options;
+
+    if (!this.verifySnapshotIntegrity(snapshot)) {
+      throw new CorruptedBackupSnapshotError(
+        `Disaster recovery aborted: Snapshot '${snapshot?.id}' failed SHA-256 integrity check. Manifest mismatch or data corruption detected.`
+      );
+    }
+
+    let restoredCount = 0;
+    let skippedCount = 0;
+    let verifiedCount = 0;
+
+    for (const item of snapshot.items) {
+      const compositeKey = this.getCompositeKey(item.bucket, item.key);
+      if (this.objects.has(compositeKey) && !overwrite) {
+        skippedCount++;
+        continue;
+      }
+
+      const buffer = Buffer.from(item.dataBase64, 'base64');
+      const itemCheck = crypto.createHash('sha256').update(buffer).digest('hex');
+      if (itemCheck !== item.checksumSha256) {
+        throw new CorruptedBackupSnapshotError(
+          `Checksum mismatch during restore on object [${item.bucket}] ${item.key}`
+        );
+      }
+
+      this.objects.set(compositeKey, {
+        bucket: item.bucket,
+        key: item.key,
+        data: buffer,
+        contentType: item.contentType,
+        metadata: item.metadata,
+        createdAt: item.createdAt,
+      });
+
+      restoredCount++;
+      verifiedCount++;
+    }
+
+    return {
+      snapshotId: snapshot.id,
+      restoredCount,
+      skippedCount,
+      verifiedCount,
+      dataLossDetected: false,
+      restoredAt: new Date().toISOString(),
+    };
+  }
 }
+
