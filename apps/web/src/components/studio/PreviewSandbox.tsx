@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Globe,
   ExternalLink,
@@ -17,6 +17,9 @@ import {
   CheckCircle2,
   Rocket,
   RotateCw,
+  Crosshair,
+  X,
+  Wand2,
 } from 'lucide-react';
 import { ViewportMode } from '@/hooks/useStudioState';
 
@@ -49,6 +52,59 @@ export function PreviewSandbox({
   const appCode = appFileKey ? files[appFileKey] : (files['src/App.tsx'] || '');
   const cssCode = files['src/index.css'] || files['src/App.css'] || '';
   const indexHtml = files['index.html'] || '';
+
+  const [isInspectMode, setIsInspectMode] = useState(false);
+  const [selectedElement, setSelectedElement] = useState<{
+    tagName: string;
+    text: string;
+    className: string;
+    outerHTML: string;
+  } | null>(null);
+  const [inspectPrompt, setInspectPrompt] = useState('');
+
+  // Listen for element click messages from inside the iframe
+  useEffect(() => {
+    const handleMessage = (e: MessageEvent) => {
+      if (!e.data) return;
+      if (e.data.type === 'ELEMENT_SELECTED') {
+        setSelectedElement(e.data.element);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  const toggleInspectMode = () => {
+    const next = !isInspectMode;
+    setIsInspectMode(next);
+    if (!next) setSelectedElement(null);
+    iframeRef.current?.contentWindow?.postMessage(
+      {
+        type: 'SET_INSPECT_MODE',
+        enabled: next,
+      },
+      '*'
+    );
+  };
+
+  const handleApplyInspectPrompt = (instruction: string) => {
+    if (!selectedElement || !onSendPrompt) return;
+    const tag = selectedElement.tagName;
+    const textInfo = selectedElement.text ? ` (containing text: "${selectedElement.text}")` : '';
+    const classInfo = selectedElement.className ? ` with classes "${selectedElement.className.slice(0, 80)}"` : '';
+    const fullPrompt = `Modify the <${tag}> element${textInfo}${classInfo}: ${instruction}. Keep the rest of the application unchanged.`;
+    onSendPrompt(fullPrompt);
+    setSelectedElement(null);
+    setInspectPrompt('');
+    setIsInspectMode(false);
+    iframeRef.current?.contentWindow?.postMessage(
+      {
+        type: 'SET_INSPECT_MODE',
+        enabled: false,
+      },
+      '*'
+    );
+  };
 
   // Clean code for in-memory Babel Standalone execution
   const sanitizedReactCode = useMemo(() => {
@@ -208,6 +264,83 @@ export function PreviewSandbox({
           compileAndRender(e.data.code, e.data.css);
         }
       });
+
+      // 3. Interactive Visual Element Inspector (Click-to-Edit)
+      let inspectMode = false;
+      let hoveredEl = null;
+
+      const overlayBadge = document.createElement('div');
+      overlayBadge.id = '__inspector_badge';
+      overlayBadge.style.cssText = 'position:fixed;display:none;background:#06b6d4;color:#020617;font-family:monospace;font-size:11px;font-weight:bold;padding:2px 6px;border-radius:4px;z-index:999999;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,0.4);';
+      document.body.appendChild(overlayBadge);
+
+      document.addEventListener('mouseover', (e) => {
+        if (!inspectMode) return;
+        const target = e.target;
+        if (!target || target === document.body || target === document.documentElement || target.id === '__inspector_badge') return;
+        
+        if (hoveredEl && hoveredEl !== target) {
+          hoveredEl.style.outline = '';
+          hoveredEl.style.outlineOffset = '';
+        }
+        
+        hoveredEl = target;
+        hoveredEl.style.outline = '2px dashed #06b6d4';
+        hoveredEl.style.outlineOffset = '2px';
+        hoveredEl.style.cursor = 'crosshair';
+
+        const rect = target.getBoundingClientRect();
+        overlayBadge.style.display = 'block';
+        overlayBadge.style.top = Math.max(0, rect.top - 24) + 'px';
+        overlayBadge.style.left = Math.max(0, rect.left) + 'px';
+        const tag = target.tagName.toLowerCase();
+        const cls = target.className && typeof target.className === 'string' ? '.' + target.className.trim().split(/\\s+/).slice(0, 2).join('.') : '';
+        overlayBadge.textContent = '<' + tag + cls + '>';
+      }, true);
+
+      document.addEventListener('mouseout', (e) => {
+        if (!inspectMode) return;
+        if (hoveredEl) {
+          hoveredEl.style.outline = '';
+          hoveredEl.style.outlineOffset = '';
+          hoveredEl.style.cursor = '';
+          hoveredEl = null;
+        }
+        overlayBadge.style.display = 'none';
+      }, true);
+
+      document.addEventListener('click', (e) => {
+        if (!inspectMode) return;
+        const target = e.target;
+        if (!target || target === document.body || target === document.documentElement || target.id === '__inspector_badge') return;
+        
+        e.preventDefault();
+        e.stopPropagation();
+
+        const tagName = target.tagName.toLowerCase();
+        const text = (target.textContent || '').trim().slice(0, 60);
+        const className = target.className && typeof target.className === 'string' ? target.className : '';
+        const outerHTML = target.outerHTML ? target.outerHTML.slice(0, 300) : '';
+
+        window.parent.postMessage({
+          type: 'ELEMENT_SELECTED',
+          element: { tagName, text, className, outerHTML }
+        }, '*');
+      }, true);
+
+      window.addEventListener('message', (e) => {
+        if (!e.data) return;
+        if (e.data.type === 'SET_INSPECT_MODE') {
+          inspectMode = Boolean(e.data.enabled);
+          if (!inspectMode && hoveredEl) {
+            hoveredEl.style.outline = '';
+            hoveredEl.style.outlineOffset = '';
+            hoveredEl.style.cursor = '';
+            hoveredEl = null;
+            overlayBadge.style.display = 'none';
+          }
+        }
+      });
     </script>
   </body>
 </html>`;
@@ -313,6 +446,20 @@ export function PreviewSandbox({
 
           {!isEmpty && (
             <>
+              {/* Element Inspector Mode Toggle (Click-to-Edit) */}
+              <button
+                onClick={toggleInspectMode}
+                className={`p-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
+                  isInspectMode
+                    ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 shadow-sm'
+                    : 'hover:bg-slate-800 text-slate-400 hover:text-white'
+                }`}
+                title={isInspectMode ? 'Exit Element Inspector' : 'Inspect Element to Edit (Click-to-Edit)'}
+              >
+                <Crosshair className="h-3.5 w-3.5" />
+                <span className="text-[11px] font-medium hidden sm:inline">Inspect</span>
+              </button>
+
               <button
                 onClick={() => postCodeToIframe(sanitizedReactCode, cssCode)}
                 className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
@@ -385,7 +532,7 @@ export function PreviewSandbox({
           </div>
         ) : (
           <div
-            className={`h-full shadow-2xl rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 flex flex-col transition-all duration-300 ${getViewportWidth()}`}
+            className={`h-full shadow-2xl rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 flex flex-col transition-all duration-300 relative ${getViewportWidth()}`}
           >
             <iframe
               key={previewKey}
@@ -395,6 +542,74 @@ export function PreviewSandbox({
               className="w-full h-full border-0 bg-slate-950"
               title="Ultrapie Live App Preview Sandbox"
             />
+
+            {/* Contextual Click-to-Edit Element Inspector Drawer */}
+            {selectedElement && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[94%] max-w-lg bg-slate-900/95 border border-cyan-500/50 backdrop-blur-md rounded-2xl shadow-2xl p-4 text-xs z-30 animate-in slide-in-from-bottom-4 duration-200">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                      <Crosshair className="w-3.5 h-3.5" />
+                    </span>
+                    <span className="font-semibold text-white">Inspected Element</span>
+                    <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-cyan-300 border border-slate-700">
+                      &lt;{selectedElement.tagName}&gt;
+                    </span>
+                    {selectedElement.text && (
+                      <span className="text-slate-400 truncate max-w-[140px]">
+                        &quot;{selectedElement.text}&quot;
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setSelectedElement(null)}
+                    className="p-1 rounded text-slate-400 hover:text-white transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Quick Action Chips */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none">
+                  {['Make Larger with Icon', 'Change to Emerald Gradient', 'Add Smooth Hover Scale', 'Make Responsive'].map((chip) => (
+                    <button
+                      key={chip}
+                      onClick={() => handleApplyInspectPrompt(chip)}
+                      className="shrink-0 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 hover:text-white transition-colors border border-slate-700"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Prompt Input & Send Button */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (inspectPrompt.trim()) {
+                      handleApplyInspectPrompt(inspectPrompt);
+                    }
+                  }}
+                  className="flex items-center gap-2 mt-1"
+                >
+                  <input
+                    type="text"
+                    value={inspectPrompt}
+                    onChange={(e) => setInspectPrompt(e.target.value)}
+                    placeholder={`e.g. Change this <${selectedElement.tagName}> styling or layout...`}
+                    className="flex-1 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!inspectPrompt.trim()}
+                    className="px-3.5 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-slate-950 font-semibold text-xs flex items-center gap-1.5 transition-colors shadow-md shadow-cyan-500/20"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Update</span>
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
         )}
       </div>
