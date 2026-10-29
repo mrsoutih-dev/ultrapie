@@ -28,8 +28,15 @@ export class StorageService {
   private cdnBaseUrl: string;
 
   constructor(options: { signingSecret?: string; cdnBaseUrl?: string } = {}) {
-    this.signingSecret = options.signingSecret || 'ultrapie-storage-signing-secret-dev';
-    this.cdnBaseUrl = options.cdnBaseUrl || 'https://assets.ultrapie.com';
+    this.signingSecret =
+      options.signingSecret ||
+      process.env.STORAGE_SIGNING_SECRET ||
+      'ultrapie-storage-signing-secret-dev';
+    this.cdnBaseUrl =
+      options.cdnBaseUrl ||
+      process.env.NEXT_PUBLIC_CDN_URL ||
+      process.env.CDN_BASE_URL ||
+      'https://media.ultrapie.com';
   }
 
   private getCompositeKey(bucket: StorageBucketType, key: string): string {
