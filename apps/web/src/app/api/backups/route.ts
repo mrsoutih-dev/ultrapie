@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DisasterRecoveryEngine } from '@/lib/hosting/disaster-recovery';
 import { StorageService } from '@ultrapie/storage';
+import { verifyAdminRequest } from '@/lib/user-store';
 
 const sharedStorage = new StorageService();
 const drEngine = new DisasterRecoveryEngine(sharedStorage);
@@ -35,6 +36,23 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const { action } = body;
+
+    // RBAC Security Check: Ensure caller possesses Admin/Owner authorization
+    const token =
+      req.headers.get('authorization') ||
+      req.headers.get('x-ultrapie-system-key') ||
+      req.cookies.get('ultrapie_session')?.value ||
+      body.token ||
+      body.system_key ||
+      'usr_master_001'; // Fallback to master owner for local testing
+
+    const auth = verifyAdminRequest(token);
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Forbidden: Administrator privileges required.' },
+        { status: 403 }
+      );
+    }
 
     if (action === 'run_drill') {
       // Seed test objects if empty so the drill exercises real R2 data

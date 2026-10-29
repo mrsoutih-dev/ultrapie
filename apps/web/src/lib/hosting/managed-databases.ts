@@ -205,7 +205,8 @@ export function provisionDatabase(params: {
 
 export function executeDatabaseQuery(
   id: string,
-  query: string
+  query: string,
+  options?: { allowDestructive?: boolean }
 ): { success: boolean; result: any; durationMs: number } {
   const db = getDatabaseById(id);
   if (!db) {
@@ -214,6 +215,24 @@ export function executeDatabaseQuery(
 
   const start = Date.now();
   const trimmed = query.trim().toUpperCase();
+
+  // Safety Guard: Check for destructive keywords in Read-Only / Safe Console Mode
+  const isDestructive =
+    trimmed.startsWith('DROP') ||
+    trimmed.startsWith('TRUNCATE') ||
+    trimmed.startsWith('DELETE') ||
+    trimmed.startsWith('ALTER') ||
+    trimmed.startsWith('FLUSHALL') ||
+    trimmed.startsWith('FLUSHDB');
+
+  if (isDestructive && !options?.allowDestructive) {
+    return {
+      success: false,
+      result:
+        "🛑 Safety Guard Blocked Destructive Operation: This command contains schema alteration or data deletion statements. To prevent accidental data loss, enable 'Destructive Execution Mode' in the console header to confirm this operation.",
+      durationMs: Date.now() - start + 2,
+    };
+  }
 
   // Simulated interactive query runner
   if (db.type === 'postgresql') {
@@ -242,7 +261,10 @@ export function executeDatabaseQuery(
       result: {
         command: trimmed.split(' ')[0],
         affectedRows: 1,
-        message: 'Query executed successfully against ' + db.databaseName,
+        message:
+          (options?.allowDestructive ? '[Destructive Mode] ' : '') +
+          'Query executed successfully against ' +
+          db.databaseName,
       },
       durationMs: Date.now() - start + 14,
     };

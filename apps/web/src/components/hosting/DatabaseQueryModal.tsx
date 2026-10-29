@@ -34,6 +34,7 @@ export function DatabaseQueryModal({
   const [result, setResult] = useState<any>(null);
   const [durationMs, setDurationMs] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [allowDestructive, setAllowDestructive] = useState(false);
 
   if (!isOpen || !database) return null;
 
@@ -60,6 +61,7 @@ export function DatabaseQueryModal({
           id: database.id,
           action: 'query',
           query: query.trim(),
+          allowDestructive,
         }),
       });
 
@@ -68,7 +70,7 @@ export function DatabaseQueryModal({
         setResult(data.result);
         setDurationMs(data.durationMs || 10);
       } else {
-        setError(data.error || 'Query failed');
+        setError(data.result || data.error || 'Query failed');
         setResult(null);
       }
     } catch (e: any) {
@@ -104,12 +106,30 @@ export function DatabaseQueryModal({
               <p className="text-xs text-slate-400 font-mono">{database.host}:{database.port}</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setAllowDestructive(!allowDestructive)}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold border transition-all ${
+                allowDestructive
+                  ? 'bg-rose-950/80 border-rose-700 text-rose-300'
+                  : 'bg-emerald-950/80 border-emerald-800 text-emerald-400'
+              }`}
+              title={
+                allowDestructive
+                  ? 'Click to restore Read-Only Safety Guard'
+                  : 'Click to enable Destructive Operations (DROP, DELETE, TRUNCATE)'
+              }
+            >
+              <span>{allowDestructive ? '⚠️ Destructive Mode' : '🛡️ Safe Guard Active'}</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* Body */}

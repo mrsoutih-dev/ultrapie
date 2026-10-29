@@ -28,13 +28,17 @@ export function QRCodeShareModal({
   deployment,
 }: QRCodeShareModalProps) {
   const [copied, setCopied] = useState(false);
+  const [urlMode, setUrlMode] = useState<'public' | 'local'>('public');
 
   if (!isOpen || !deployment) return null;
 
-  const targetUrl =
+  const publicUrl = `https://${deployment.customDomain || deployment.subdomain}`;
+  const localUrl =
     typeof window !== 'undefined'
       ? `${window.location.origin}/preview/${deployment.slug}`
-      : `https://${deployment.customDomain || deployment.subdomain}`;
+      : `http://localhost:3005/preview/${deployment.slug}`;
+
+  const targetUrl = urlMode === 'public' ? publicUrl : localUrl;
 
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(
     targetUrl
@@ -84,7 +88,33 @@ export function QRCodeShareModal({
         </div>
 
         {/* Body */}
-        <div className="p-6 flex flex-col items-center text-center space-y-5">
+        <div className="p-6 flex flex-col items-center text-center space-y-4">
+          {/* URL Target Mode Switcher */}
+          <div className="flex items-center gap-1 p-1 bg-slate-950 border border-slate-800 rounded-xl text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => setUrlMode('public')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                urlMode === 'public'
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              🌐 Public Edge URL
+            </button>
+            <button
+              type="button"
+              onClick={() => setUrlMode('local')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                urlMode === 'local'
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              💻 Local Preview
+            </button>
+          </div>
+
           {/* QR Code Container */}
           <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 shadow-inner relative group">
             <div className="w-56 h-56 rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center">

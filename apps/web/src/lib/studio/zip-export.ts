@@ -17,9 +17,17 @@ export async function exportProjectToZip({
     .replace(/[^a-z0-9-_]/g, '-')
     .replace(/-+/g, '-');
 
-  // Add all existing workspace files
+  // Add all existing workspace files (sanitizing dependencies to pinned compatible versions)
   for (const [filePath, content] of Object.entries(files)) {
-    zip.file(filePath, content);
+    if (filePath === 'package.json') {
+      const sanitizedPkg = content
+        .replace(/"lucide-react":\s*"[^"]*"/g, '"lucide-react": "^0.475.0"')
+        .replace(/"react":\s*"\^?18[^"]*"/g, '"react": "^19.0.0"')
+        .replace(/"react-dom":\s*"\^?18[^"]*"/g, '"react-dom": "^19.0.0"');
+      zip.file(filePath, sanitizedPkg);
+    } else {
+      zip.file(filePath, content);
+    }
   }
 
   // Ensure essential Vite + React 19 boilerplate files exist so the ZIP is runnable out-of-the-box
@@ -40,7 +48,7 @@ export async function exportProjectToZip({
           dependencies: {
             react: '^19.0.0',
             'react-dom': '^19.0.0',
-            'lucide-react': '^1.16.0',
+            'lucide-react': '^0.475.0',
             clsx: '^2.1.1',
             'tailwind-merge': '^3.0.2',
           },

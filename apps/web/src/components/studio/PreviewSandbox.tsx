@@ -148,6 +148,25 @@ export function PreviewSandbox({
     </div>
 
     <script>
+      // Safe in-memory storage polyfill to prevent opaque origin SecurityError when sandboxed
+      try {
+        window.localStorage;
+      } catch (e) {
+        const memoryStore = {};
+        const safeStorage = {
+          getItem: (key) => memoryStore[key] || null,
+          setItem: (key, val) => { memoryStore[key] = String(val); },
+          removeItem: (key) => { delete memoryStore[key]; },
+          clear: () => { for (const k in memoryStore) delete memoryStore[k]; },
+          get length() { return Object.keys(memoryStore).length; },
+          key: (i) => Object.keys(memoryStore)[i] || null,
+        };
+        try {
+          Object.defineProperty(window, 'localStorage', { value: safeStorage, configurable: true });
+          Object.defineProperty(window, 'sessionStorage', { value: safeStorage, configurable: true });
+        } catch (_) {}
+      }
+
       // Initial embedded component source (ensures direct execution on first load or new tab)
       const INITIAL_SOURCE = ${JSON.stringify(codeToRun)};
       const INITIAL_CSS = ${JSON.stringify(cssCode)};
@@ -538,14 +557,14 @@ export function PreviewSandbox({
               key={previewKey}
               ref={iframeRef}
               srcDoc={previewHtml}
-              sandbox="allow-scripts allow-same-origin allow-modals allow-forms allow-popups"
+              sandbox="allow-scripts allow-modals allow-forms allow-popups"
               className="w-full h-full border-0 bg-slate-950"
               title="Ultrapie Live App Preview Sandbox"
             />
 
             {/* Contextual Click-to-Edit Element Inspector Drawer */}
             {selectedElement && (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[94%] max-w-lg bg-slate-900/95 border border-cyan-500/50 backdrop-blur-md rounded-2xl shadow-2xl p-4 text-xs z-30 animate-in slide-in-from-bottom-4 duration-200">
+              <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 w-[96%] sm:w-[94%] max-w-lg max-h-[60vh] sm:max-h-[50vh] overflow-y-auto bg-slate-900/95 border border-cyan-500/50 backdrop-blur-md rounded-2xl shadow-2xl p-3 sm:p-4 text-xs z-30 animate-in slide-in-from-bottom-4 duration-200">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="p-1 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">

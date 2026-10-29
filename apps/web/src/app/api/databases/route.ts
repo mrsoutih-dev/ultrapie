@@ -76,7 +76,9 @@ export async function PATCH(req: NextRequest) {
       if (!query) {
         return NextResponse.json({ error: 'Query string is required' }, { status: 400 });
       }
-      const execution = executeDatabaseQuery(id, query);
+      const execution = executeDatabaseQuery(id, query, {
+        allowDestructive: Boolean(body.allowDestructive),
+      });
       return NextResponse.json({
         success: execution.success,
         result: execution.result,
