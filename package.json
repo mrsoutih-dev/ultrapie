@@ -8,6 +8,8 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "clean": "turbo run clean",
+    "cli": "node scripts/ultrapie-cli.cjs",
+    "ultrapie": "node scripts/ultrapie-cli.cjs",
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
     "test": "vitest run",
     "infra:up": "docker compose up -d",
