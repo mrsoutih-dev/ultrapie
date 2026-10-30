@@ -11,6 +11,7 @@ import { GitHubDeployModal } from '@/components/studio/GitHubDeployModal';
 import { CoolifyStudioDeployModal } from '@/components/studio/CoolifyStudioDeployModal';
 import { EasyDeployModal } from '@/components/studio/EasyDeployModal';
 import { TemplateGalleryModal } from '@/components/studio/TemplateGalleryModal';
+import { StudioDatabaseModal } from '@/components/studio/StudioDatabaseModal';
 import { exportProjectToZip } from '@/lib/studio/zip-export';
 import { useStudioState } from '@/hooks/useStudioState';
 import { useTheme } from '@/context/ThemeContext';
@@ -62,6 +63,7 @@ export default function StudioPage() {
   const [isCoolifyOpen, setIsCoolifyOpen] = useState(false);
   const [isEasyDeployOpen, setIsEasyDeployOpen] = useState(false);
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
+  const [isDatabaseOpen, setIsDatabaseOpen] = useState(false);
 
   const handleExportZip = async () => {
     await exportProjectToZip({
@@ -115,6 +117,7 @@ export default function StudioPage() {
         onOpenCoolify={() => setIsCoolifyOpen(true)}
         onOpenEasyDeploy={() => setIsEasyDeployOpen(true)}
         onOpenTemplates={() => setIsTemplatesOpen(true)}
+        onOpenDatabase={() => setIsDatabaseOpen(true)}
         onExportZip={handleExportZip}
         onResetStudio={resetStudio}
         isDeploying={isDeploying}
@@ -264,6 +267,13 @@ export default function StudioPage() {
         isOpen={isTemplatesOpen}
         onClose={() => setIsTemplatesOpen(false)}
         onSelectTemplate={(tplFiles, name) => loadTemplate(tplFiles, name)}
+      />
+
+      {/* 8. Live Database Explorer Modal */}
+      <StudioDatabaseModal
+        isOpen={isDatabaseOpen}
+        onClose={() => setIsDatabaseOpen(false)}
+        onSendPrompt={sendPrompt}
       />
     </div>
   );

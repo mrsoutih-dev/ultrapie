@@ -234,8 +234,57 @@ export function executeDatabaseQuery(
     };
   }
 
-  // Simulated interactive query runner
+  // Live PostgreSQL query runner with container integration & safety
   if (db.type === 'postgresql') {
+    if (process.platform === 'linux' || fs.existsSync('/var/run/docker.sock')) {
+      try {
+        const { execSync } = require('child_process');
+        let sqlCmd = trimmed;
+        if (sqlCmd.endsWith(';')) sqlCmd = sqlCmd.slice(0, -1);
+
+        if (sqlCmd.toUpperCase().startsWith('SELECT')) {
+          const jsonWrapped = `SELECT json_agg(q) FROM (${sqlCmd}) q;`;
+          const raw = execSync(
+            `docker exec ultrapie-postgres psql -U ultrapie -d ultrapie_dev -t -A -c "${jsonWrapped.replace(/"/g, '\\"')}"`,
+            { encoding: 'utf-8', timeout: 5000 }
+          ).trim();
+
+          if (raw && raw !== 'null') {
+            const parsed = JSON.parse(raw);
+            return {
+              success: true,
+              result: parsed,
+              durationMs: Date.now() - start,
+            };
+          }
+        } else {
+          // INSERT, UPDATE, CREATE TABLE, etc.
+          const raw = execSync(
+            `docker exec ultrapie-postgres psql -U ultrapie -d ultrapie_dev -c "${sqlCmd.replace(/"/g, '\\"')}"`,
+            { encoding: 'utf-8', timeout: 5000 }
+          ).trim();
+
+          return {
+            success: true,
+            result: {
+              command: trimmed.split(' ')[0],
+              message: raw || 'Statement executed successfully on live PostgreSQL cluster.',
+            },
+            durationMs: Date.now() - start,
+          };
+        }
+      } catch (err: any) {
+        const msg = ((err.stdout || '') + ' ' + (err.stderr || '')).trim();
+        if (msg.includes('ERROR:')) {
+          return {
+            success: false,
+            result: msg,
+            durationMs: Date.now() - start,
+          };
+        }
+      }
+    }
+
     if (trimmed.startsWith('SELECT') && trimmed.includes('USERS')) {
       return {
         success: true,
@@ -272,6 +321,54 @@ export function executeDatabaseQuery(
 
   // Redis runner
   if (db.type === 'redis') {
+    if (process.platform === 'linux' || fs.existsSync('/var/run/docker.sock')) {
+      try {
+        const { execSync } = require('child_process');
+        const redisCmd = trimmed;
+        const upper = redisCmd.toUpperCase();
+
+        // Safety guard for flush
+        if ((upper.startsWith('FLUSHALL') || upper.startsWith('FLUSHDB')) && !options?.allowDestructive) {
+          return {
+            success: false,
+            result: 'Safety Guard: FLUSH operations are destructive. Enable Destructive Mode to execute.',
+            durationMs: Date.now() - start,
+          };
+        }
+
+        const raw = execSync(
+          `docker exec ultrapie-redis redis-cli ${redisCmd}`,
+          { encoding: 'utf-8', timeout: 5000 }
+        ).trim();
+
+        let parsed: any = raw;
+        if (upper.startsWith('KEYS') || upper.startsWith('SCAN')) {
+          parsed = raw.split('\n').map((k: string) => k.trim()).filter(Boolean);
+        } else if (raw.startsWith('{') || raw.startsWith('[')) {
+          try {
+            parsed = JSON.parse(raw);
+          } catch {
+            // keep raw
+          }
+        }
+
+        return {
+          success: true,
+          result: parsed,
+          durationMs: Date.now() - start,
+        };
+      } catch (err: any) {
+        const msg = ((err.stdout || '') + ' ' + (err.stderr || '')).trim();
+        if (msg) {
+          return {
+            success: false,
+            result: msg,
+            durationMs: Date.now() - start,
+          };
+        }
+      }
+    }
+
     if (trimmed.startsWith('KEYS') || trimmed.startsWith('SCAN')) {
       return {
         success: true,

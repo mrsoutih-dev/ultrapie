@@ -30,6 +30,7 @@ import {
   ShieldCheck,
   LayoutDashboard,
   Download,
+  Database,
 } from 'lucide-react';
 import { ViewportMode } from '@/hooks/useStudioState';
 import { useAuth } from '@/context/AuthContext';
@@ -47,6 +48,7 @@ interface TopBarProps {
   onOpenCoolify?: () => void;
   onOpenEasyDeploy?: () => void;
   onOpenTemplates?: () => void;
+  onOpenDatabase?: () => void;
   onExportZip?: () => void;
   onResetStudio?: () => void;
   isDeploying?: boolean;
@@ -64,6 +66,7 @@ export function TopBar({
   onOpenCoolify,
   onOpenEasyDeploy,
   onOpenTemplates,
+  onOpenDatabase,
   onExportZip,
   onResetStudio,
   isDeploying,
@@ -253,6 +256,22 @@ export function TopBar({
           >
             <Sparkles className="h-3.5 w-3.5 text-purple-400" />
             <span>Templates</span>
+          </button>
+        )}
+
+        {/* Live Database Explorer */}
+        {onOpenDatabase && (
+          <button
+            onClick={onOpenDatabase}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border transition-colors ${
+              isLight
+                ? 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100'
+                : 'bg-slate-900 border-purple-800/70 text-purple-300 hover:bg-slate-800'
+            }`}
+            title="Open Live PostgreSQL Database & Prisma Schema Explorer"
+          >
+            <Database className="h-3.5 w-3.5 text-purple-400" />
+            <span>Database</span>
           </button>
         )}
 

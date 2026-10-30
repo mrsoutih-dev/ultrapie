@@ -375,10 +375,11 @@ export function AIChatPane({
         {messages.length <= 1 && (
           <div className="mb-2.5 flex flex-wrap gap-1.5">
             {[
-              'Build a modern SaaS landing page',
-              'Create a developer portfolio',
-              'Build an analytics dashboard',
-              'Create an e-commerce store',
+              'Fullstack app with PostgreSQL & Prisma',
+              'SaaS landing page with crypto payments',
+              'Real-time analytics & telemetry dashboard',
+              'Task manager with persistent CRUD database',
+              'Developer portfolio with dark mode',
             ].map((chip, idx) => (
               <button
                 type="button"
