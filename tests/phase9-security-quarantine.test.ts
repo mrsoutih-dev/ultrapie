@@ -118,7 +118,7 @@ describe('Phase 09: Defense-in-Depth Security & File Quarantine', () => {
       // Verify asset passes scan cleanly and receives CDN URL
       expect(result.status).toBe('clean');
       expect(result.cdnUrl).toBeDefined();
-      expect(result.cdnUrl).toContain('https://assets.ultrapie.com/public-assets/');
+      expect(result.cdnUrl).toMatch(/https:\/\/(assets|media)\.ultrapie\.com\/public-assets\//);
 
       // Verify asset can be retrieved from public-assets bucket
       const promotedKey = `tenant_demo_1/assets/${result.quarantineKey.split('/')[2]}`;

@@ -12,6 +12,9 @@ export interface UserSession {
   subscriptionExpiresAt: string | null;
   avatarUrl?: string;
   provider?: 'credentials' | 'google';
+  paymentMethod?: 'CRYPTO' | 'CARD';
+  cryptoCurrency?: string;
+  cryptoTxHash?: string;
 }
 
 interface AuthContextType {
@@ -19,10 +22,13 @@ interface AuthContextType {
   isLoading: boolean;
   isAdmin: boolean;
   login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
-  loginWithGoogle: (email?: string, name?: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: (email?: string, name?: string, credential?: string) => Promise<{ success: boolean; error?: string }>;
   register: (name: string, email: string, pass: string) => Promise<{ success: boolean; error?: string; requiresSubscription?: boolean }>;
   logout: () => void;
-  subscribe: (plan: 'STARTER' | 'PRO' | 'BUSINESS') => Promise<{ success: boolean; error?: string }>;
+  subscribe: (
+    plan: 'STARTER' | 'PRO' | 'BUSINESS',
+    paymentInfo?: { paymentMethod?: 'CRYPTO' | 'CARD'; cryptoCurrency?: string; cryptoTxHash?: string }
+  ) => Promise<{ success: boolean; error?: string }>;
   isAuthModalOpen: boolean;
   authModalMode: 'login' | 'register';
   openAuthModal: (mode?: 'login' | 'register') => void;
@@ -49,10 +55,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isGoogleGuideOpen, setIsGoogleGuideOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
 
-  // Load user session on mount
+  // Load user session on mount across subdomains (SSO cookie verification)
   useEffect(() => {
     async function loadUser() {
       try {
+        // Check server session via SSO cookie (/api/auth/me)
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.user) {
+            setUser(data.user);
+            localStorage.setItem('ultrapie_user_session', JSON.stringify(data.user));
+            return;
+          }
+        }
+
+        // If server returned null, check local storage
         const stored = localStorage.getItem('ultrapie_user_session');
         if (stored) {
           try {
@@ -62,29 +80,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(null);
           }
         } else {
-          // Check if user previously logged out
-          const hasVisited = localStorage.getItem('ultrapie_has_visited');
-          if (!hasVisited) {
-            // First visit master owner initialization
-            const defaultAdmin: UserSession = {
-              id: 'usr_master_001',
-              name: 'Elhoussine Soutih',
-              email: 'zohodigital.com@gmail.com',
-              role: 'OWNER',
-              isSubscribed: true,
-              plan: 'PRO',
-              subscriptionExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-              provider: 'credentials',
-            };
-            setUser(defaultAdmin);
-            localStorage.setItem('ultrapie_user_session', JSON.stringify(defaultAdmin));
-            localStorage.setItem('ultrapie_has_visited', 'true');
-          } else {
-            setUser(null);
-          }
+          setUser(null);
         }
       } catch (err) {
         console.warn('Failed to load user session:', err);
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
@@ -102,51 +102,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const data = await res.json();
       if (!res.ok) {
-        return { success: false, error: data.error || 'Login failed' };
+        return { success: false, error: data.error || 'Invalid credentials' };
       }
 
       setUser(data.user);
       localStorage.setItem('ultrapie_user_session', JSON.stringify(data.user));
-      localStorage.setItem('ultrapie_has_visited', 'true');
       setIsAuthModalOpen(false);
-
-      if (!data.user.isSubscribed) {
-        setIsSubscriptionModalOpen(true);
-      }
 
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: err.message || 'Network error' };
+      return { success: false, error: err.message || 'Network error during login' };
     }
   }, []);
 
-  const loginWithGoogle = useCallback(async (customEmail?: string, customName?: string) => {
+  const loginWithGoogle = useCallback(async (customEmail?: string, customName?: string, credential?: string) => {
     try {
-      const res = await fetch('/api/auth/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: customEmail || user?.email || 'zohodigital.com@gmail.com',
-          name: customName || user?.name || 'Elhoussine Soutih',
-          avatarUrl: 'https://lh3.googleusercontent.com/a/ACg8ocLQeK_Google_Profile',
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        return { success: false, error: data.error || 'Google login failed' };
+      // If client provided a credential from Google One Tap or Google Sign-In SDK
+      if (credential || (customEmail && customName)) {
+        const res = await fetch('/api/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            credential,
+            email: customEmail,
+            name: customName,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          return { success: false, error: data.error || 'Google login failed' };
+        }
+        setUser(data.user);
+        localStorage.setItem('ultrapie_user_session', JSON.stringify(data.user));
+        setIsAuthModalOpen(false);
+        return { success: true };
       }
 
-      setUser(data.user);
-      localStorage.setItem('ultrapie_user_session', JSON.stringify(data.user));
-      localStorage.setItem('ultrapie_has_visited', 'true');
-      setIsAuthModalOpen(false);
+      // Check if Google OAuth Client ID is configured on the server
+      const configRes = await fetch('/api/auth/google');
+      const configData = await configRes.json();
+      if (!configData.configured) {
+        // Open the Google Cloud setup guide modal and let user know
+        setIsAuthModalOpen(false);
+        setIsGoogleGuideOpen(true);
+        return {
+          success: false,
+          error: 'Google OAuth Client ID is not configured yet. Please configure it in Google Cloud Console or sign in with Email & Password.',
+        };
+      }
 
+      // If configured, redirect to Google OAuth flow
+      window.location.href = '/api/auth/google';
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || 'Google Auth Error' };
     }
-  }, [user]);
+  }, []);
 
   const register = useCallback(async (name: string, email: string, pass: string) => {
     try {
@@ -163,10 +174,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(data.user);
       localStorage.setItem('ultrapie_user_session', JSON.stringify(data.user));
-      localStorage.setItem('ultrapie_has_visited', 'true');
       setIsAuthModalOpen(false);
 
-      // New users must select a monthly subscription
+      // New users can select a monthly subscription
       if (!data.user.isSubscribed) {
         setIsSubscriptionModalOpen(true);
       }
@@ -177,14 +187,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (e) {
+      // non-fatal
+    }
     setUser(null);
     localStorage.removeItem('ultrapie_user_session');
-    localStorage.setItem('ultrapie_has_visited', 'true');
     setIsAdminModalOpen(false);
   }, []);
 
-  const subscribe = useCallback(async (plan: 'STARTER' | 'PRO' | 'BUSINESS') => {
+  const subscribe = useCallback(async (
+    plan: 'STARTER' | 'PRO' | 'BUSINESS',
+    paymentInfo?: { paymentMethod?: 'CRYPTO' | 'CARD'; cryptoCurrency?: string; cryptoTxHash?: string }
+  ) => {
     try {
       if (!user) {
         setIsAuthModalOpen(true);
@@ -194,7 +211,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await fetch('/api/auth/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: user.email, plan }),
+        body: JSON.stringify({
+          email: user.email,
+          plan,
+          paymentMethod: paymentInfo?.paymentMethod || 'CARD',
+          cryptoCurrency: paymentInfo?.cryptoCurrency,
+          cryptoTxHash: paymentInfo?.cryptoTxHash,
+        }),
       });
 
       const data = await res.json();

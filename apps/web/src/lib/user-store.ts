@@ -14,6 +14,9 @@ export interface UserAccount {
   subscriptionExpiresAt: string | null;
   avatarUrl?: string;
   provider?: 'credentials' | 'google';
+  paymentMethod?: 'CRYPTO' | 'CARD';
+  cryptoCurrency?: string;
+  cryptoTxHash?: string;
   createdAt: string;
 }
 
@@ -351,7 +354,15 @@ export function verifyUserCredentials(email: string, password: string): UserAcco
   return user;
 }
 
-export function updateUserSubscription(email: string, plan: 'STARTER' | 'PRO' | 'BUSINESS'): UserAccount {
+export function updateUserSubscription(
+  email: string,
+  plan: 'STARTER' | 'PRO' | 'BUSINESS',
+  paymentInfo?: {
+    paymentMethod?: 'CRYPTO' | 'CARD';
+    cryptoCurrency?: string;
+    cryptoTxHash?: string;
+  }
+): UserAccount {
   const store = getUserStore();
   const user = findUserByEmail(email);
   if (!user) {
@@ -360,17 +371,26 @@ export function updateUserSubscription(email: string, plan: 'STARTER' | 'PRO' | 
 
   user.isSubscribed = true;
   user.plan = plan;
+  if (paymentInfo) {
+    user.paymentMethod = paymentInfo.paymentMethod || 'CARD';
+    if (paymentInfo.cryptoCurrency) user.cryptoCurrency = paymentInfo.cryptoCurrency;
+    if (paymentInfo.cryptoTxHash) user.cryptoTxHash = paymentInfo.cryptoTxHash;
+  }
   // 30 days subscription
   user.subscriptionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
   persistUsersToDisk(store);
+
+  const methodLabel = paymentInfo?.paymentMethod === 'CRYPTO' 
+    ? `Crypto (${paymentInfo.cryptoCurrency || 'USDT'}, Tx: ${paymentInfo.cryptoTxHash?.substring(0, 10) || 'Verified'})`
+    : 'Credit Card';
 
   logStudioAction({
     userId: user.id,
     userEmail: user.email,
     userName: user.name,
     action: 'SUBSCRIBE',
-    details: `Updated subscription to ${plan} Plan ($${plan === 'STARTER' ? 19 : plan === 'PRO' ? 49 : 99}/mo)`,
-    metadata: { plan },
+    details: `Updated subscription to ${plan} Plan ($${plan === 'STARTER' ? 19 : plan === 'PRO' ? 49 : 99}/mo) via ${methodLabel}`,
+    metadata: { plan, paymentInfo },
   });
 
   return user;

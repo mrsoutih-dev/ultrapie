@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyUserCredentials } from '@/lib/user-store';
+import { createSessionToken, setSessionCookie } from '@/lib/auth-cookie';
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,6 +23,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const sessionToken = createSessionToken({ id: user.id, email: user.email });
+
     // Return safe user profile and session token
     const safeUser = {
       id: user.id,
@@ -31,7 +34,7 @@ export async function POST(req: NextRequest) {
       isSubscribed: user.isSubscribed,
       plan: user.plan,
       subscriptionExpiresAt: user.subscriptionExpiresAt,
-      token: 'session_' + Buffer.from(`${user.id}:${user.email}:${Date.now()}`).toString('base64'),
+      token: sessionToken,
     };
 
     const res = NextResponse.json({
@@ -39,12 +42,8 @@ export async function POST(req: NextRequest) {
       user: safeUser,
     });
 
-    // Set cookie for convenience
-    res.cookies.set('ultrapie_session', safeUser.token, {
-      path: '/',
-      httpOnly: false,
-      maxAge: 30 * 24 * 60 * 60,
-    });
+    // Set SSO cookie shared across .ultrapie.com and all subdomains
+    setSessionCookie(res, sessionToken, req);
 
     return res;
   } catch (error: any) {

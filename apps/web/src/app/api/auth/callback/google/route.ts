@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createOrLoginGoogleUser } from '@/lib/user-store';
+import { createSessionToken, setSessionCookie } from '@/lib/auth-cookie';
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get('code');
   const error = searchParams.get('error');
@@ -46,15 +47,9 @@ export async function GET(req: Request) {
           avatarUrl: googleUser.picture,
         });
 
-        const token = 'tok_g_' + Math.random().toString(36).substring(2, 15);
+        const sessionToken = createSessionToken({ id: user.id, email: user.email });
         const res = NextResponse.redirect(new URL('/studio?auth=success', req.url));
-        res.cookies.set('ultrapie_session', token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          path: '/',
-          maxAge: 30 * 24 * 60 * 60,
-        });
+        setSessionCookie(res, sessionToken, req);
         return res;
       }
     }

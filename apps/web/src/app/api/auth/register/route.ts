@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createUser } from '@/lib/user-store';
+import { createSessionToken, setSessionCookie } from '@/lib/auth-cookie';
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,6 +24,8 @@ export async function POST(req: NextRequest) {
     const displayName = (name && name.trim()) || email.split('@')[0];
     const user = createUser(displayName, email, password);
 
+    const sessionToken = createSessionToken({ id: user.id, email: user.email });
+
     const safeUser = {
       id: user.id,
       name: user.name,
@@ -31,7 +34,7 @@ export async function POST(req: NextRequest) {
       isSubscribed: user.isSubscribed, // False initially until monthly subscription is activated
       plan: user.plan,
       subscriptionExpiresAt: user.subscriptionExpiresAt,
-      token: 'session_' + Buffer.from(`${user.id}:${user.email}:${Date.now()}`).toString('base64'),
+      token: sessionToken,
     };
 
     const res = NextResponse.json({
@@ -41,11 +44,7 @@ export async function POST(req: NextRequest) {
       requiresSubscription: true,
     });
 
-    res.cookies.set('ultrapie_session', safeUser.token, {
-      path: '/',
-      httpOnly: false,
-      maxAge: 30 * 24 * 60 * 60,
-    });
+    setSessionCookie(res, sessionToken, req);
 
     return res;
   } catch (error: any) {

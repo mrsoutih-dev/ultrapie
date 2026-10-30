@@ -70,10 +70,7 @@ export function AuthModal() {
     setError(null);
     setIsGoogleSubmitting(true);
     try {
-      const res = await loginWithGoogle(
-        mode === 'login' && email ? email : undefined,
-        mode === 'register' && name ? name : undefined
-      );
+      const res = await loginWithGoogle();
       if (!res.success) {
         setError(res.error || 'Google authentication failed');
       }

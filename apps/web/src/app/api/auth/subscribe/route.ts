@@ -4,7 +4,7 @@ import { activateUserSubscription, findUserByEmail } from '@/lib/user-store';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, plan = 'PRO' } = body;
+    const { email, plan = 'PRO', paymentMethod = 'CARD', cryptoCurrency, cryptoTxHash } = body;
 
     if (!email) {
       return NextResponse.json({ error: 'User email is required' }, { status: 400 });
@@ -13,7 +13,11 @@ export async function POST(req: NextRequest) {
     const validPlans: Array<'STARTER' | 'PRO' | 'BUSINESS'> = ['STARTER', 'PRO', 'BUSINESS'];
     const chosenPlan = validPlans.includes(plan.toUpperCase()) ? plan.toUpperCase() : 'PRO';
 
-    const user = activateUserSubscription(email, chosenPlan);
+    const user = activateUserSubscription(email, chosenPlan, {
+      paymentMethod: paymentMethod === 'CRYPTO' ? 'CRYPTO' : 'CARD',
+      cryptoCurrency,
+      cryptoTxHash,
+    });
 
     const safeUser = {
       id: user.id,
@@ -23,6 +27,9 @@ export async function POST(req: NextRequest) {
       isSubscribed: user.isSubscribed,
       plan: user.plan,
       subscriptionExpiresAt: user.subscriptionExpiresAt,
+      paymentMethod: user.paymentMethod,
+      cryptoCurrency: user.cryptoCurrency,
+      cryptoTxHash: user.cryptoTxHash,
     };
 
     return NextResponse.json({

@@ -29,6 +29,11 @@ export async function GET(req: NextRequest) {
               isSubscribed: user.isSubscribed,
               plan: user.plan,
               subscriptionExpiresAt: user.subscriptionExpiresAt,
+              avatarUrl: user.avatarUrl,
+              provider: user.provider,
+              paymentMethod: user.paymentMethod,
+              cryptoCurrency: user.cryptoCurrency,
+              cryptoTxHash: user.cryptoTxHash,
             },
           });
         }
