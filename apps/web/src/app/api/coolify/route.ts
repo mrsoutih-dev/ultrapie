@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 interface CoolifyRequest {
   coolifyUrl?: string;
   token?: string;
+  isDemo?: boolean;
   action: 'ping' | 'servers' | 'applications' | 'projects' | 'deploy' | 'createApp';
   appUuid?: string;
   payload?: any;
@@ -93,7 +94,8 @@ export async function POST(req: NextRequest) {
     ];
 
     // If no credentials supplied or demo requested
-    if (!coolifyUrl || !token) {
+    const isDemoMode = !coolifyUrl || !token || body.isDemo || body.coolifyUrl === 'demo';
+    if (isDemoMode) {
       if (action === 'ping') {
         return NextResponse.json({
           status: 'simulated',
@@ -104,6 +106,12 @@ export async function POST(req: NextRequest) {
       }
       if (action === 'servers') {
         return NextResponse.json({ servers: mockServers, isDemo: true });
+      }
+      if (action === 'projects') {
+        return NextResponse.json({
+          projects: [{ id: 1, uuid: 'proj-default-01', name: 'Ultrapie Cloud Ecosystem' }],
+          isDemo: true,
+        });
       }
       if (action === 'applications') {
         return NextResponse.json({ applications: mockApplications, isDemo: true });
@@ -191,6 +199,18 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ servers: data, isDemo: false });
       }
 
+      case 'projects': {
+        const res = await fetch(`${coolifyUrl}/api/v1/projects`, {
+          headers,
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!res.ok) {
+          throw new Error(`Failed to fetch projects: HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        return NextResponse.json({ projects: data, isDemo: false });
+      }
+
       case 'applications': {
         const res = await fetch(`${coolifyUrl}/api/v1/applications`, {
           headers,
@@ -228,7 +248,7 @@ export async function POST(req: NextRequest) {
       case 'createApp': {
         const appPayload = { ...payload };
 
-        // Auto-resolve server_uuid if missing
+        // 1. Auto-resolve server_uuid if missing or invalid
         if (!appPayload.server_uuid) {
           const srvRes = await fetch(`${coolifyUrl}/api/v1/servers`, { headers, signal: AbortSignal.timeout(5000) }).catch(() => null);
           if (srvRes && srvRes.ok) {
@@ -238,6 +258,51 @@ export async function POST(req: NextRequest) {
             }
           }
         }
+
+        // 2. Auto-resolve project_uuid if missing (required by Coolify v4.5+)
+        if (!appPayload.project_uuid) {
+          const projRes = await fetch(`${coolifyUrl}/api/v1/projects`, { headers, signal: AbortSignal.timeout(5000) }).catch(() => null);
+          if (projRes && projRes.ok) {
+            const projs = await projRes.json();
+            if (Array.isArray(projs) && projs.length > 0) {
+              appPayload.project_uuid = projs[0].uuid;
+            }
+          }
+
+          // If no project exists yet, auto-create one
+          if (!appPayload.project_uuid) {
+            const createProjRes = await fetch(`${coolifyUrl}/api/v1/projects`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ name: 'Ultrapie Cloud Ecosystem' }),
+              signal: AbortSignal.timeout(5000),
+            }).catch(() => null);
+            if (createProjRes && createProjRes.ok) {
+              const createdProj = await createProjRes.json();
+              appPayload.project_uuid = createdProj.uuid;
+            }
+          }
+        }
+
+        // 3. Set default environment_name if neither environment_name nor environment_uuid is specified
+        if (!appPayload.environment_name && !appPayload.environment_uuid) {
+          appPayload.environment_name = 'production';
+        }
+
+        // 4. Map fqdn to domains (Coolify v4.5+ requires 'domains' and rejects 'fqdn')
+        if (appPayload.fqdn && !appPayload.domains) {
+          appPayload.domains = appPayload.fqdn;
+        }
+        delete appPayload.fqdn;
+
+        // 5. Extract internal control flags not accepted by Coolify API
+        const autoDeployRequested = appPayload.autoDeploy !== false;
+        delete appPayload.autoDeploy;
+        delete appPayload.server_name;
+        delete appPayload.targetFqdn;
+        delete appPayload.action;
+        delete appPayload.coolifyUrl;
+        delete appPayload.token;
 
         const res = await fetch(`${coolifyUrl}/api/v1/applications/public`, {
           method: 'POST',
@@ -254,9 +319,19 @@ export async function POST(req: NextRequest) {
         const data = await res.json();
         const appUuid = data.uuid || data.id;
 
+        // Normalize response object fields for frontend compatibility
+        data.domains = data.domains || appPayload.domains;
+        data.fqdn = data.fqdn || data.domains;
+        data.name = data.name || appPayload.name;
+        data.git_repository = data.git_repository || appPayload.git_repository;
+        data.git_branch = data.git_branch || appPayload.git_branch;
+        data.build_pack = data.build_pack || appPayload.build_pack;
+        data.status = data.status || 'running';
+        data.updated_at = data.updated_at || new Date().toISOString();
+
         // Auto-trigger deployment if requested
         let deployResult = null;
-        if (appPayload.autoDeploy !== false && appUuid) {
+        if (autoDeployRequested && appUuid) {
           const deployRes = await fetch(`${coolifyUrl}/api/v1/deploy?uuid=${encodeURIComponent(appUuid)}`, {
             method: 'POST',
             headers,

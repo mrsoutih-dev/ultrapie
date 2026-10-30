@@ -95,6 +95,7 @@ export function CoolifyStudioDeployModal({
             git_repository: gitRepo.trim(),
             git_branch: gitBranch.trim(),
             build_pack: buildPack,
+            domains: targetFqdn,
             fqdn: targetFqdn,
             ports_exposes: '3000',
             autoDeploy: true,

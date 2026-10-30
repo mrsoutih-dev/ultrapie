@@ -18,6 +18,7 @@ export default defineConfig({
       '@ultrapie/domains': path.resolve(import.meta.dirname, './packages/domains/src/index.ts'),
       '@ultrapie/security': path.resolve(import.meta.dirname, './packages/security/src/index.ts'),
       '@ultrapie/database': path.resolve(import.meta.dirname, './database/src/index.ts'),
+      'next/server': path.resolve(import.meta.dirname, './apps/web/node_modules/next/server.js'),
     },
   },
 });

@@ -48,6 +48,12 @@ export function CreateCoolifyAppModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string; fqdn?: string } | null>(null);
 
+  React.useEffect(() => {
+    if (!serverUuid && servers.length > 0) {
+      setServerUuid(servers[0].uuid);
+    }
+  }, [servers, serverUuid]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -82,6 +88,7 @@ export function CreateCoolifyAppModal({
             git_repository: gitRepository.trim(),
             git_branch: gitBranch.trim(),
             build_pack: buildPack,
+            domains: targetFqdn,
             fqdn: targetFqdn,
             server_uuid: serverUuid || (servers[0] ? servers[0].uuid : undefined),
             ports_exposes: portsExposes.trim(),
