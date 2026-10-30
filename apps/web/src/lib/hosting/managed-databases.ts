@@ -336,8 +336,10 @@ export function executeDatabaseQuery(
           };
         }
 
+        // Quote wildcards like * to prevent shell glob expansion in bash
+        const sanitizedRedisCmd = redisCmd.replace(/\*/g, "'*'");
         const raw = execSync(
-          `docker exec ultrapie-redis redis-cli ${redisCmd}`,
+          `docker exec ultrapie-redis redis-cli ${sanitizedRedisCmd}`,
           { encoding: 'utf-8', timeout: 5000 }
         ).trim();
 
